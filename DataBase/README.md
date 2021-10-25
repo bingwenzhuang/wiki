@@ -47,7 +47,7 @@
 - Hive
 - Hbase
 - kudu
-- Solr
+- Doris
 - Teradata
 
 ## ETL工具
@@ -61,6 +61,7 @@
 - RocksDB
 - MonogDB
 - ElasticSearch
+- Solr
 - Splunk
 - Cassandra 
 
