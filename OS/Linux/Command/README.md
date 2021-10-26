@@ -1,0 +1,165 @@
+# Linux Command
+
+- ls 
+- cd 
+- cp
+- ln
+- [find]()
+- mkdir
+- mv 
+- pwd
+- rename
+- rm 
+- rmdir
+- touch
+- tree
+- basename
+- dirname
+- chattr
+- lsattr
+- file
+- md5sum
+- cat
+- tac 是cat的反向拼写，因此命令的功能为反向显示文件内容
+- more
+- less
+- head
+- tail 
+- [cut]() 将文件的每一行按指定分隔符分割并输出
+- [split]() 分割文件为不同的小片段
+- [paste]() 按行合并文件内容
+- [sort]()
+- [uniq]()
+- wc
+- iconv 转换文件的编码格式
+- dos2unix
+- recode 
+- diff 
+- vimdiff
+- rev 反向输出文件内容
+- [grep/egrep]()
+- join 按两个文件的相同字段合并
+- [tr]() 替换或删除字符
+- rar
+- unrar
+- [tar]() 打包压缩
+- [unzip]() 解压文件
+- [gzip]() gzip压缩工具
+- gunzip
+- [zip]() 压缩工具
+- bunzip2 
+- bzip2 
+- [uname]()
+- [hostname]()
+- [dmesg]()
+- uptime
+- stat
+- du 
+- df
+- top
+- free
+- date
+- cal 
+- which 
+- find
+- whereis
+- locate 从数据库(/var/lib/mlocate/mlocate.db)查找命令，使用updatedb更新库
+- useradd
+- usermod
+- userdel
+- groupadd
+- passwd
+- chage 修改用户密码有效期限
+- id
+- su
+- visudo 编辑/etc/sudoers文件的专属命令
+- sudo 
+- telnet
+- ssh
+- scp
+- wget
+- ping 
+- route 
+- ifconfig
+- ifup
+- ifdown
+- netstat
+- ss
+- nmap
+- lsof
+- mail
+- mutt
+- nslookup 交互式查询互联网DNS服务器的命令
+- dig 查找DNS解析过程
+- host 查询DNS的命令
+- traceroute 追踪数据传输路由状况
+- tcpdump 命令行的抓包工具
+- mount
+- fuser 
+- umount 
+- fsck 检查并修复Linux文件系统
+- badblocks 
+- dd 
+- dumpe2fs
+- dump
+- fdisk
+- parted
+- mkfs
+- partprobe
+- e2fsck
+- mkswap
+- swapon
+- swapoff
+- sync
+- rsync 
+- resize2fs
+- chmod
+- chown
+- chgrp
+- umask
+- whoami
+- who 显示目前登录系统的用户信息
+- w 显示已经登陆系统的用户列表，并显示用户正在执行的指令
+- last 显示登入系统的用户
+- lastlog  显示系统中所有用户最近一次登录信息
+- users 显示当前登录系统的所有用户的用户列表
+- finger 查找并显示用户信息
+- echo 
+- printf 将结果格式化输出到标准输出
+- rpm 
+- yum
+- watch 周期性的执行给定的命令，并将命令的输出以全屏方式显示
+- alias
+- unalis
+- clear
+- history
+- eject 弹出光驱
+- time 
+- nc 功能强大的网络工具
+- xargs 将标准输入转换成命令行参数
+- exec 调用并执行指令的命令
+- export
+- unset
+- set
+- type 
+- bc
+- chkconfig 管理Linux系统开机启动项
+- vmstat 
+- mpstat 显示各个可用CPU的状态统计
+- iostat 
+- sar 
+- ipcs 用于报告Linux中进程间通信设施的状态，显示的信息包括消息列表、共享内存和信号量的信息
+- ipcrm 用来删除一个或更多的消息队列、信号量集或者共享内存标识
+- strace 用于诊断、调试Linux用户空间跟踪器。我们用它来监控用户空间进程和内核的交互，比如系统调用、信号传递、进程状态变更等
+- ltrace 命令会跟踪进程的库函数调用, 它会显现出哪个库函数被调用
+- kill 
+- pkill
+- ps 
+- pstree
+- nice/renice 调整程序运行的优先级
+- pgrep 
+- runlevel
+- init 
+- service 
+- dmidecode 
+- hdparm 
