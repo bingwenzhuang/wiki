@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# [[ -p /dev/stdin ]] && { mapfile -t; set -- "${MAPFILE[@]}"; }
+
+FILE_NAME=`mktemp`
+# for i in "$@"; do
+#  echo "$i" >> ${FILE_NAME}
+# done
+K8S_NAMESPACE=$1
+STS_NAME=$2
+INDEX_NUM=$3
+if [[ -z ${INDEX_NUM} ]] ; then 
+ INDEX_NUM=0
+fi 
+
+kubectl -n ${K8S_NAMESPACE} exec ${STS_NAME}-${INDEX_NUM} -c redis-cluster -- redis-cli --cluster info $(kubectl -n ${K8S_NAMESPACE} get pod ${STS_NAME}-${INDEX_NUM} -o jsonpath='{.status.podIP}'):6379
+
+kubectl -n ${K8S_NAMESPACE} exec ${STS_NAME}-${INDEX_NUM} -c redis-cluster -- redis-cli cluster nodes > ${FILE_NAME}
+
+declare -A M_LIST
+old_IFS=${IFS}
+IFS=$'\n'
+for i in `cat ${FILE_NAME} | grep master`; do
+    IP=`echo $i | awk '{split($2,a,":");print a[1]}'`
+    ID=`echo $i | awk '{print $1}'`
+    #kubectl -n ${K8S_NAMESPACE} get svc -o custom-columns=:metadata.name,:spec.clusterIP --no-headers=true
+    NAME=`kubectl -n ${K8S_NAMESPACE} get svc -o custom-columns=:metadata.name,:spec.clusterIP --no-headers=true | grep -w ${IP} | awk '{print $1}'`
+    if [[ -z ${NAME} ]] ; then 
+      NAME="${IP}[${ID}]"
+    else
+      NAME="${NAME}($IP)[${ID}]"
+    fi
+    M_LIST[${ID}]=${NAME}
+done
+ 
+declare -A S_LIST
+for i in `cat ${FILE_NAME} | grep slave`; do
+    IP=`echo $i | awk '{split($2,a,":");print a[1]}'`
+    M_ID=`echo $i | awk '{print $4}'`
+    S_ID=`echo $i | awk '{print $1}'`
+    ##kubectl -n ${K8S_NAMESPACE} get svc -o custom-columns=:metadata.name,:spec.clusterIP --no-headers=true
+    NAME=`kubectl -n ${K8S_NAMESPACE} get svc -o custom-columns=:metadata.name,:spec.clusterIP --no-headers=true | grep -w ${IP} | awk '{print $1}'`
+    if [[ -z ${NAME} ]] ; then 
+      R_M_IP='nil'
+      NAME="${IP}($R_M_IP)[${S_ID}]"
+    else
+      R_M_IP=`kubectl -n ${K8S_NAMESPACE} exec ${NAME} -c redis-cluster -- redis-cli config get slaveof | tail -1 | awk '{print $1}'`
+      NAME="${NAME}($IP)($R_M_IP)[${S_ID}]"
+    fi
+    S_LIST[${M_ID}]=${NAME}
+done
+
+# IFS=$old_IFS
+
+# for key in ${!M_LIST[@]}
+# do
+#     echo "${key} -> ${M_LIST[$key]}"
+# done
+
+# for key in ${!S_LIST[@]}
+# do
+#     echo "${key} -> ${S_LIST[$key]}"
+# done
+
+
+# for key in ${!S_LIST[@]}
+# do  
+#     M_ID=`echo ${M_LIST[$key]} | awk -F "(" '{print $2}' | awk -F ")" '{print $1}'`
+#     R_M_ID=`echo ${S_LIST[$key]} | awk -F "(" '{print $3}' | awk -F ")" '{print $1}'`
+#     if [[ -z ${M_ID} ]] ; then  
+#         M_ID=M_ID
+#     fi
+#     if [[ -z ${R_M_ID} ]] ; then  
+#         R_M_ID=R_M_ID
+#     fi
+#     if [ ${M_ID} = ${R_M_ID} ]; then 
+#       FLAG='successed'
+#     else
+#       FLAG='failed'
+#     fi
+#     echo "${M_LIST[$key]} -> ${S_LIST[$key]}  $FLAG"
+# done
+
+for key in ${!M_LIST[@]}
+do  
+    M_ID=`echo ${M_LIST[$key]} | awk -F "(" '{print $2}' | awk -F ")" '{print $1}'`
+    R_M_ID=`echo ${S_LIST[$key]} | awk -F "(" '{print $3}' | awk -F ")" '{print $1}'`
+    if [[ -z ${M_ID} ]] ; then  
+        M_ID=M_ID
+    fi
+    if [[ -z ${R_M_ID} ]] ; then  
+        R_M_ID=R_M_ID
+    fi
+    if [ ${M_ID} = ${R_M_ID} ]; then 
+      FLAG='successed'
+    else
+      FLAG='failed'
+    fi
+    echo "${M_LIST[$key]} -> ${S_LIST[$key]}  $FLAG"
+done
+
+# kubectl -n devops exec test-redis-cluster-0 -- redis-cli --cluster info $(kubectl -n devops get pod test-redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
