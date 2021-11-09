@@ -8,6 +8,9 @@
 - Raft
 - Paxos
 - 2PC
+- 3PC
+- Percolator
+- TCC
 - MVCC
 - WAL
 - Index
