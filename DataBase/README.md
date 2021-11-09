@@ -87,3 +87,7 @@
 - Pentaho
 - Tableau
 - Openi
+
+## 数据特征方法
+
+## 常用AI算法模型
