@@ -7,6 +7,10 @@
 
 ## 代理
 - nginx
+- lvs
 - haproxy
 - keepalive 
+- heartbeat 
 - shardingsphere
+
+

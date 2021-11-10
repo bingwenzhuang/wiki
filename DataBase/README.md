@@ -7,6 +7,7 @@
 - BASE
 - Raft
 - Paxos
+- PacificA
 - 2PC
 - 3PC
 - Percolator
