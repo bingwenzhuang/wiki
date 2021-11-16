@@ -28,7 +28,8 @@
   - 领域概念建模
 
 ## 关系型数据库
-- MySQL(MariaDB)
+- MySQL(MariaDB/Percona)
+- vitess
 - Oracle
 - Postgresql
 - MSSQL
@@ -37,6 +38,7 @@
 - Sqlite
 - TBase
 - Tidb(国内)
+- Yugabyte-db
 - SequoiaDB(国内)
 - Aurora
 - PolarDB
