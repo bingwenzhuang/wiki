@@ -2,6 +2,7 @@
 ```
 SET global SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 SET GLOBAL sql_mode = 'ALLOW_INVALID_DATES';
+SET GLOBAL sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
 前提：
 在删除确实时间点 和结束点没有发生过DDL 
 操作步骤
@@ -38,4 +39,18 @@ cat test.yq.delete.txt  | awk -F"=|/*" '{
         printf $2",";
     };
 }' > test.yq.insert.sql
+## 再if嵌套
+cat test.yq.delete.txt  | awk -F"=|/*" '{
+    if($0 ~ /^INSERT|^VALUES|^);/){
+        print $0;
+    }else{
+	    if($1 ~ /8/){
+	        printf "FROM_UNIXTIME("$2"),";
+	    }else if($1 ~ /^1/){
+	        printf $2;
+	    }else{ 
+	        printf $2",";
+	    }
+    };
+}' > test.yq.insert.sql11
 ```
