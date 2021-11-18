@@ -44,9 +44,9 @@ cat test.yq.delete.txt  | awk -F"=|/*" '{
     if($0 ~ /^INSERT|^VALUES|^);/){
         print $0;
     }else{
-	    if($1 ~ /8/){
+	    if($1 ~ /@8/){
 	        printf "FROM_UNIXTIME("$2"),";
-	    }else if($1 ~ /^)/){
+	    }else if($1 ~ /@35/){
 	        printf $2;
 	    }else{ 
 	        printf $2",";
