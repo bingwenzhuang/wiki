@@ -18,6 +18,7 @@
   - B-tree
   - B+tree
   - LSM
+  - Rtree 空间索引
 - Checkpoint
 - Compaction
 - 建模
