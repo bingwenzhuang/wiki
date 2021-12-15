@@ -1,0 +1,61 @@
+1. 索引数据和数据的一致性问题
+
+
+CREATE TABLE user (
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    short_description TEXT
+);
+
+CREATE VIRTUAL TABLE user_fts USING fts5(
+    username, 
+    short_description, 
+	
+    email UNINDEXED,  -- 
+    content='user', 
+    content_rowid='id' 
+);
+
+INSERT INTO user (
+    username, 
+    email, 
+    short_description
+) VALUES 
+    ('user_1', 'user_1@gmail.com', 'I am a senior designer with experience in Javascript'),
+    ('user_2', 'user_2@gmail.com', 'I am a web developer working on Angular'),
+    ('user_3', 'user_3@gmail.com', 'I am a backend junior developer and have worked in Finance'),
+    ('user_4', 'user_4@gmail.com', 'I am a senior engineer, expert in concurrent backend system');
+	
+	
+select * from user;
+SELECT * FROM user_fts;
+SELECT * FROM user_fts WHERE user_fts MATCH 'seni*' ORDER BY rank;
+
+
+CREATE TRIGGER user_ai AFTER INSERT ON user
+    BEGIN
+        INSERT INTO user_fts (rowid, username, short_description)
+        VALUES (new.id, new.username, new.short_description);
+    END;
+
+CREATE TRIGGER user_ad AFTER DELETE ON user
+    BEGIN
+        INSERT INTO user_fts (user_fts, rowid, username, short_description)
+        VALUES ('delete', old.id, old.username, old.short_description);
+    END;
+
+CREATE TRIGGER user_au AFTER UPDATE ON user
+    BEGIN
+        INSERT INTO user_fts (user_fts, rowid, username, short_description)
+        VALUES ('delete', old.id, old.username, old.short_description);
+        INSERT INTO user_fts (rowid, username, short_description)
+        VALUES (new.id, new.username, new.short_description);
+    END;
+	
+drop TABLE user_fts;
+
+fts参数
+	合并index参数 automerge
+	crisismerge
+	

@@ -1,0 +1,237 @@
+体系结构 
+	模式 -- delete/wal
+	文件
+	内存
+		https://www.sqlite.org/malloc.html
+		page_size 
+		cache_size
+		mmap_size -- 缓存区和用户控件复制数据 -- 直接访问磁盘内存 -- windows 可能无法使用 -- 不是很成熟，不使用所有场景
+	隔离级别
+		事务tps 7200rpm 60/s
+	并发
+		(参数调优)
+SQL 
+	表的存储结构 
+		https://www.sqlite.org/withoutrowid.html
+		类型的亲和性
+		索引组织表
+			含有blob不建议使用
+			字段太多的不建议使用 -- page_size 调整为4KB的话，基本都能用的
+	类型
+		SQLite uses dynamic typing. Content can be stored as INTEGER, REAL, TEXT, BLOB, or as NULL.
+		dynamic type动态数据类型
+		https://www.sqlite.org/datatype3.html
+		排序问题
+		null特殊处理 -- 尽量不采用null -- 处理方式sqlite3跟oracle mysql 类似
+		字段声明的类型应该插入对应的类型数据，避免index 无法使用的情况
+	使用对象限制
+		禁止使用存储过程，触发器
+	优化类
+		cross join 语句 --- 强制左表为外表 +可以避免使用索引
+		index by 语句 强制使用索引
+统计信息收集
+	ANALYZE tablename;
+	select * from sqlite_stat1;
+	## 关闭数据库前执行该语句
+	PRAGMA analysis_limit=1000; ## 分析行限制 有版本限制 3.32.0版本
+	PRAGMA optimize; ## 3.18.0
+	sqlite_stat4 是直方图的
+	Automatically: 
+限制
+	https://www.sqlite.org/limits.html
+	对象个数跟数据库启动时间成正比 -- 会加载对象到内存中
+	数据库的大小 4294967294 * page_size
+	attach 数据库限制为10个
+	sql 语句绑定参数个数限制默认为 999，对于 3.32.0 之后的 SQLite 版本默认为 32766
+	join 限制64个
+	SQL语句大小限制1,000,000,000字节
+	字段个数默认是2k
+	1 billion字节数 字段值的大小
+	-- 这部分需要进行一些精细的限制 
+锁的类型
+	https://www.sqlite.org/lockingv3.html
+	unlocked
+	shared
+	reserved  意向写锁 , 可以与shared共享，允许继续进入shared锁，一个sqlite3 仅能有一个
+	pending   意向写锁2， 可以与已存在shared共享，不允许继续进入shared锁。 提交时候获取pending锁 ,等待shared锁释放后获取排它锁
+		1. commit
+		2. 内存溢出
+	exclusive
+版本升级
+	查询计划的稳定性?是重要的考虑点
+	PRAGMA 不保证向后兼容的 -- 升级需要特别注意
+压测方式
+
+
+SELECT DISTINCT m.name || '.' || ii.name AS 'indexed-columns'
+  FROM sqlite_schema AS m,
+       pragma_index_list(m.name) AS il,
+       pragma_index_info(il.name) AS ii
+ WHERE m.type='table'
+ ORDER BY 1;
+
+integer primary key
+wal -- 锁机制也是一样的吗? -- 需要查看下 -- 读是能阻塞写.
+
+
+journal_mode ==  分为几种模式呢?
+
+大概是两种模式，一种是wal，另一种非wal
+
+数据文件:
+	回滚日志 rollback journal(hot journal)
+	WAL日志  write-ahead log file(hot WAL file)
+
+逻辑组成(page为最小组成成员 -- 如何设置页的下大小呢?) PRAGMA page_size = 4096 ; -- 4096 8192 16384 
+	lock-byte page
+	freelist page
+	b-tree page
+	payload overflow page
+	pointer map page
+	
+
+数据文件大小的限制问题 -- windows/linux/android/ios/位数限制
+
+pragma case_sensitive_like; 默认是大小写不敏感
+PRAGMA page_size = xxx;
+PRAGMA cache_size = 2000; 
+PRAGMA encoding;  == 固定设置为utf-8 ?? -- 表情符号  emoji's  -- 表请符号需要特殊处理?
+pragma auto_vacuum;  -- 缩减空间 -- 可以在大规模的删除和更新后手动触发 vacuum 进行 sqlite 数据文件优化操作. 碎片整理 -- 库开始创建时有用 --那么后续如何收回了
+pragma incremental_vacuum;
+PRAGMA secure_delete=ON; --这个是啥
+PRAGMA synchronous; -- 
+PRAGMA locking_mode;
+PRAGMA journal_mode;
+PRAGMA wal_checkpoint;
+PRAGMA wal_autocheckpoint; -- 检验点分三种类型 PASSIVE, FULL, and RESTART
+pragma journal_size_limit; -- 限制回滚日志或者wal文件大小
+wal 模式下可能出现sqlite-busy的情况-- 应用程序方面需要做好异常的处理
+	1.其他排它锁模式打开数据文件时候
+	2.close连接时间范围内，发起的连接
+	3.crash recover期间
+字符集-utf-8, 大小写敏感吗? -- pragma case_sensitive_like; 默认是大小写不敏感
+字段尽量不为NULL ，为NULL默认排序为第一个
+
+查看sqlite3 --- 他们具体采用的版本
+
+WITHOUT ROWID -- 3.8.2 版本
+  
+analysis_limit # 3.32.0版本采用应该配合optimize使用 
+auto_vacuum  # 关闭掉, 可在一次大更新或者删除后执行一下, 回收空间整理碎片功能 -- 也可以交付给客户决定
+automatic_index # 关闭掉,表结构可控，避免测试无发现问题
+cache_size # 设置大点，至少应该10M吧  cache_size*page_size 
+cache_spill # 关闭掉,防止大事务导致阻塞事件
+case_sensitive_like # 大小写是否敏感
+encoding # utf-8 表情符号,目前是如何处理的呢
+incremental_vacuum # 关闭vacuum 手动触发 
+journal_mode # wal 
+journal_size_limit # 采用默认值-1 ,不做限制
+locking_mode # 采用默认值
+mmap_size  # windows 无法使用，统一不用, 如果要依赖平台优化，可设置
+optimize # 统计信息收集, 3.32.0版本以上可结合analysis_limit使用
+page_size # 页的大小，一般是采用4KB, 8KB, 16KB  需要压测决定, oracle 默认是8KB INNODB 16kb . 我建议采用8kb
+synchronous # full 和 normal的区别 full是每次提交刷盘包括normal的情况;normal是在发生checkpoint或者datafile刷盘是发生
+temp_store # 目前是file ,默认不变
+wal_autocheckpoint # 应该设置大些,具体多大再讨论了
+ 
+
+
+
+
+管理语句
+# 返回连接
+PRAGMA collation_list;
+PRAGMA count_changes;
+PRAGMA stats;
+PRAGMA shrink_memory;
+ 
+ 
+PRAGMA encoding;
+PRAGMA encoding = 'UTF-8';
+PRAGMA encoding = 'UTF-16';
+PRAGMA encoding = 'UTF-16le';
+PRAGMA encoding = 'UTF-16be';
+
+ 
+
+synchronous 
+page_size
+cache_size
+encoding
+auto_vacuum -- 看情况,一般是手动执行 -- 或者让客户自己执行 -- 空间优化
+incremental_vacuum
+journal_mode
+wal_checkpoint -- 默认值就好
+wal_autocheckpoint 
+journal_size_limit
+locking_mode
+PRAGMA secure_delete=ON; --这个是啥
+automatic_index --? 要吗? -- 有好处也有坏处  --  我是建议关闭 -- 表结构可控，避免测试无发现问题
+
+
+pikchr
+
+pragma journal_mode='wal';
+pragma case_sensitive_like; 默认是大小写不敏感
+PRAGMA page_size = xxx;
+PRAGMA cache_size = 2000; 
+PRAGMA encoding;  == 固定设置为utf-8 ?? -- 表情符号  emoji's  -- 表请符号需要特殊处理?
+pragma auto_vacuum;  -- 缩减空间 -- 可以在大规模的删除和更新后手动触发 vacuum 进行 sqlite 数据文件优化操作. 碎片整理 -- 库开始创建时有用 --那么后续如何收回了
+pragma incremental_vacuum;
+ 
+ 
+ 
+### FTS4 和 5 实现模式
+https://www.cnblogs.com/163yun/p/9803301.html
+倒排索引
+Instance-List 分段存储
+
+支持分词情况 -- 支持哪些分词器 --  ICU分词器
+支持中文查询情况
+兼容吗?
+压缩问题 
+正文问题
+前缀问题
+大小写问题
+
+分词器
+	mmfts5 -- 自定义分词器
+	ICU
+
+查询
+	全文
+	词查询
+	前缀查询
+	短语查询
+	NEAR查询
+	逻辑查询 -- 带括号优先级的查询支持，需要打开 -DSQLITE_ENABLE_FTS3_PARENTHESIS 开关编译SQLite
+		NOT高于AND,高于OR
+	内建函数
+		offsets snippet matchinfo
+		FTS5 -- bm23()、highlight()、snippet()  自定义内建函数
+
+维护命令
+	优化表
+	重建索引
+
+优化建议
+	控制范围：我们真的必要返回所有结果么？是否可以考虑按区间分批返回呢？
+	考虑matchinfo：有些时候我们只需要返回部分查询结果的偏移量或者片段，这个时候我们可以考虑先用带matchinfo的子查询确定我们需要返回偏移量或片段的rowid集，然后再对这个集合内的记录进行深度的offsets或者snippet
+	考虑外部正文：如果你需要索引的内容完全可以从一个必要的外部表中获取，不妨考虑下外部正文。
+	
+
+SELECT * FROM message WHERE message MATCH '"移 NEAR 动"';
+
+## 
+CREATE VIRTUAL TABLE mail USING fts5(sender, title, body, tokenize = 'porter ascii');
+- tokenize 分词器 -- 有自定义的 -- 要看下如何编译ICU分词器或者更改ICU分词器编译, 类似实现微信的simple 分词器
+- prefix  -- 前缀 --干嘛用
+- content -- 映射的存储表
+- content_rowid --- 映射存储表的id
+- columnsize  -- 
+- detail 
+-- UNINDEXED 可以用于不索引
+ 
+ 
+
+ 

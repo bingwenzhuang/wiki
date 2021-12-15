@@ -1,0 +1,466 @@
+elasticsearch 
+tools 
+	chrome 查看插件
+
+涉及到高可用的关注点
+1. 每个节点的数据的刷新到disk的规则
+	refresh
+	flush
+	translog
+	segment
+	commit point
+2. 每个副本跟主副本同步的规则 
+    index.write.wait_for_active_shards -- 是指副本数? 活跃的副本?  未活跃的副本?
+3. 副分片提升为主分片，但丢失部分数据，主分片恢复，如何处理 -- 故障转移规则 (如果持有主分片的节点挂掉了，一个副本分片就会晋升为主分片的角色)
+4. 写和读的负载均衡规则
+5. master选主规则
+
+高频问题
+1. 深度分页
+	from+size
+	search after -- 需要保证排序字段的唯一性吗? 基于准实时
+	scroll api -- 基于快照的 -- 官方不推荐使用
+	 
+
+跨集群检索
+
+elasticsearch自我保护的配置
+search.default_search_timeout
+earch.low_level_cancellation
+action.search.shard_count.limit
+index.max_result_window
+index.max_inner_result_window -- 结果中聚合结果的限制
+index.max_docvalue_fields_search --SQL语句docvalue_fields字段的内容
+index.query.default_field
+index.unassigned.node_left.delayed_timeout
+
+
+1. 原理
+2. 官方文档
+3. 向上学，向下帮
+
+	
+节点role
+	master 	
+		保活 - ping 数据节点保活问题
+		自动发现服务 -- 其他节点
+		路由信息维护及发送给各个节点
+			shard = hash(routing) % number_of_primary_shards
+		选举master 	
+			zen discovery
+			
+	data   -- 
+	data_content -- 
+	data_hot --
+	data_warm
+	data_cold
+	data_frozen
+	ingest -- 更新 
+	ml
+	remote_cluster_client
+	transform
+	
+	
+文件结构 
+	_index 索引名称
+	_type  文档表示的对象类别
+	_id    文档的唯一值
+	_source 特殊情况可以去掉，重建索引是比较有用的字段
+	_all    特殊情况可以去掉
+	alias   使用，用于零宕机迁移情况
+	
+doc
+	mapping
+		动态映射
+			自定义动态映射规则
+			date_detection 
+			dynamic_templates 
+			缺省映射
+	analysis
+		倒序索引 Term  
+		分析器	
+			字符过滤器 针对原始文本
+			分词器
+			Token过滤器 针对已生成的term
+		已知分析器
+			标准分析器
+			简单分析器
+			空格分析器
+			语言分析器
+		数据变更的时候使用分析器
+		查询的时候
+	query dsl
+	
+字段类型
+	字符串: string
+	整数 : byte, short, integer, long
+	浮点数: float, double
+	布尔型: boolean
+	日期: date
+	
+	
+1. master保活，和data 节点的通信问题
+2. 倒序索引的原因
+3. LSM存储和刷盘问题
+4. 相关性
+5. 分片调度问题
+6. 副本的一致性
+	consistency  (routing 、 replication 、 consistency 和 timeout 参数)
+
+分片是数据的容器,一个Lucene实例就是一个分片
+	
+
+当规定数量(one, quorum, all)的 Shard 执行成功后
+refresh_interval决定了es的实时性
+
+
+es写过程(单机)
+	写内容和translog --> 每个refresh_interval刷内存数据到文件系统(cache,该docid才可查) --> 30min 或 segment 空间大于512M segment 持久化commit point --> commit point文件合并为一个大文件(LSM level)\\
+	
+	
+分片大问题 -- 预设 -- 按照时间分片(索引模板)
+机器划分--打标签
+冷热数据划分存储 -- 
+
+分片
+	倒序索引是不变的，通过多层合并获取正确的数据(包含被删除的元组信息)
+		segment
+		commit point segment 
+		段的合并 -- 删除墓碑 -- 默认是有资源限制的 -- optimize api接口可以
+			POST /logstash-2014-10/_optimize?max_num_segments=1  -- optimize接口是没有资源使用限制,会影响整个系统的性能(可以先移除副本,再开启)
+	refresh 刷下到segment中(cache/file) refresh_interval 默认是1秒一次 -- refresh 才会生产新的segment (memory --> FS)
+	translog redolog - 每隔5秒fsync到disk 或者是每次写完成后(flush 会截断translog,默认是30分钟一次) 
+		 "index.translog.durability": "async",
+		 "index.translog.sync_interval": "5s"
+	关闭索引
+		_flush
+		_close
+		_open
+	归档旧索引
+		
+
+
+查询
+	bool
+	must
+		文档 必须 匹配这些条件才能被包含进来。
+	must_not 
+		文档 必须不 匹配这些条件才能被包含进来。
+	should(至少有一个语句要匹配，与 OR 等价)
+	filters
+	过滤情况
+		当使用于 过滤情况 时，查询被设置成一个“不评分”或者“过滤”查询
+		性能优越:过滤（filtering）的目标是减少那些需要通过评分查询（scoring queries）进行检查的文档。
+		精确查询，需要采用filters -- 结果能被缓存
+	查询情况
+		当使用于 查询情况 时，查询就变成了一个“评分”的查询
+	term/terms
+	exits/missing
+	Doc Values 列存储 -- 排序/聚合/地理位置过滤/某些与字段相关的脚本计算 
+		排序发生在索引时建立的平行数据结构中
+	每次查询都会回表	
+	preference 偏好
+	timed_out  超时
+	游标查询 scroll GET /old_index/_search?scroll=1m
+	
+查询2
+	相似度
+	部分匹配
+	模糊匹配
+	语言感知
+	
+	
+1. 数据的持久化
+	segment
+	segment merge 
+	translog 
+2. 数据副本的一致性
+	主从模式，基于微软的PacificA算法
+		PacificA算法
+			replica group 
+			configuration
+			configuration version
+			Serial Number
+			Prepared List
+			Committed List
+			写一致性算法默认测试qourum
+3. 集群的脑裂处理
+4. 选举模式
+	
+	
+Zen Discovery
+	ping
+	seed nodes
+	unicast
+	file-based
+	Master election
+	Fault detection
+	cluster status update
+	no master block
+	single-node discovery
+	好像少了路由更新 -- 需要看下 -是不是在tranform层
+自动发现服务
+选主服务(Bully算法)
+路由服务
+
+
+primary-replica resync completed with 0 operations
+	
+commit point -- 其实类似checkpoint 
+分片机制
+cluster discovery
+shard分片负载
+shard副本、请求路由、集群扩容、shard重新分配
+	
+操作命令
+#分析器
+curl -X GET "https://127.0.0.1:9200/_analyze?pretty"  -sku yadmin:Yealink@1105 -H 'Content-Type: application/json' -d'
+{
+  "analyzer": "standard",
+  "text": "Text to analyze"
+}
+'
+
+#mapping
+"tweet": { 
+    "type":     "string",
+    "analyzer": "english",
+    "fields": {
+        "raw": { 
+            "type":  "string",
+            "index": "not_analyzed"
+        }
+    }
+}
+
+
+curl -XPOST 'https://127.0.0.1:9200/_refresh' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cat/allocation/?v=true' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cat/aliases/?v=true' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cat/indices/?v=true' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cat/tasks?v=true' -sku yadmin:Yealink@1105  
+
+curl -XGET 'https://127.0.0.1:9200/.kibana_1/_mapping?pretty' -sku yadmin:Yealink@1105  
+curl -XGET 'https://127.0.0.1:9200/.kibana_1/_settings?pretty&include_defaults' -sku yadmin:Yealink@1105  
+
+curl -XGET 'https://127.0.0.1:9200/_cluster/settings/?pretty&include_defaults' -sku yadmin:Yealink@1105
+
+curl -XGET 'https://127.0.0.1:9200/?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cluster/health/?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cluster/settings/?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cluster/stats/?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_cluster/state/?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_nodes/stats/jvm/?pretty' -sku yadmin:Yealink@1105
+
+curl -XGET 'https://127.0.0.1:9200/_nodes/_all/process?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_nodes/ingest?pretty' -sku yadmin:Yealink@1105
+curl -XGET 'https://127.0.0.1:9200/_nodes/stats?pretty' -sku yadmin:Yealink@1105
+
+如何查看文档的配置 -- 文档默认配置如何设置
+curl -X GET "localhost:9200/gb/_mapping/tweet?pretty"
+
+curl -X GET "localhost:9200/_search?size=5&pretty"
+curl -X GET "localhost:9200/_search?size=5&from=5&pretty"
+curl -X GET "localhost:9200/_search?size=5&from=10&pretty"
+
+./bin/elasticsearch-sql-cli https://yadmin:Yealink@1105@127.0.0.1:9200/
+
+https://stackoverflow.com/questions/54228216/how-to-improve-elasticsearch-performance
+
+
+curl -X GET "localhost:9200/gb/_analyze?pretty" -H 'Content-Type: application/json' -d'
+{
+  "field": "tweet",
+  "text": "Black-cats" 
+}
+'
+curl -X GET "localhost:9200/gb/_analyze?pretty" -H 'Content-Type: application/json' -d'
+{
+  "field": "tag",
+  "text": "Black-cats" 
+}
+'
+curl -X PUT "localhost:9200/blogs?pretty" -H 'Content-Type: application/json' -d'
+{
+   "settings" : {
+      "number_of_shards" : 3,
+      "number_of_replicas" : 1
+   }
+}
+'
+curl -X PUT "localhost:9200/megacorp/employee/1?pretty" -H 'Content-Type: application/json' -d'
+{
+    "first_name" : "John",
+    "last_name" :  "Smith",
+    "age" :        25,
+    "about" :      "I love to go rock climbing",
+    "interests": [ "sports", "music" ]
+}
+'
+curl -i -XHEAD http://localhost:9200/website/blog/123
+curl -X GET "localhost:9200/megacorp/employee/1?pretty"
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty"
+curl -X GET "localhost:9200/megacorp/employee/_search?q=last_name:Smith&pretty"
+curl -X GET "localhost:9200/website/blog/123?_source=title,text&pretty"
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "match" : {
+            "last_name" : "Smith"
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "bool": {
+            "must": {
+                "match" : {
+                    "last_name" : "smith" 
+                }
+            },
+            "filter": {
+                "range" : {
+                    "age" : { "gt" : 30 } 
+                }
+            }
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "match" : {
+            "about" : "rock climbing"
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "match_phrase" : {
+            "about" : "rock climbing"
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "match_phrase" : {
+            "about" : "rock climbing"
+        }
+    },
+    "highlight": {
+        "fields" : {
+            "about" : {}
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "aggs": {
+    "all_interests": {
+      "terms": { "field": "interests" }
+    }
+  }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": {
+    "match": {
+      "last_name": "smith"
+    }
+  },
+  "aggs": {
+    "all_interests": {
+      "terms": {
+        "field": "interests"
+      }
+    }
+  }
+}
+'
+curl -X GET "localhost:9200/megacorp/employee/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "aggs" : {
+        "all_interests" : {
+            "terms" : { "field" : "interests" },
+            "aggs" : {
+                "avg_age" : {
+                    "avg" : { "field" : "age" }
+                }
+            }
+        }
+    }
+}
+'
+curl -X GET "localhost:9200/_mget?pretty" -H 'Content-Type: application/json' -d'
+{
+   "docs" : [
+      {
+         "_index" : "website",
+         "_type" :  "blog",
+         "_id" :    2
+      },
+      {
+         "_index" : "website",
+         "_type" :  "pageviews",
+         "_id" :    1,
+         "_source": "views"
+      }
+   ]
+}
+' 
+
+
+curl -X GET "localhost:9200/gb/tweet/_validate/query?pretty" -H 'Content-Type: application/json' -d'
+{
+   "query": {
+      "tweet" : {
+         "match" : "really powerful"
+      }
+   }
+}
+'
+curl -X GET "localhost:9200/gb/tweet/_validate/query?explain&pretty" -H 'Content-Type: application/json' -d'
+{
+   "query": {
+      "tweet" : {
+         "match" : "really powerful"
+      }
+   }
+}
+'
+
+curl -X GET "localhost:9200/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+    "query" : {
+        "bool" : {
+            "must":   { "match": { "tweet": "manage text search" }},
+            "filter" : { "term" : { "user_id" : 2 }}
+        }
+    },
+    "sort": [
+        { "date":   { "order": "desc" }},
+        { "_score": { "order": "desc" }}
+    ]
+}
+'
+curl -X PUT "localhost:9200/my_index_v1?pretty"
+curl -X PUT "localhost:9200/my_index_v1/_alias/my_index?pretty"
+curl -X GET "localhost:9200/*/_alias/my_index?pretty"
+
+
+
+Filtering settings by name
+
+
+
+
+

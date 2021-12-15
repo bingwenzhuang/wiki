@@ -1,0 +1,131 @@
+docker run -p 9090:9090 prom/prometheus
+
+docker run -p 9090:9090 -v /path/to/prometheus.yml:/etc/prometheus/prometheus prom/prometheus
+docker run -p 9090:9090 -v /path/to/config:/etc/prometheus prom/prometheus
+
+
+docker run  -d \
+  -p 9090:9090 \
+  -v /root/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml  \
+  --restart=always \
+  --name prometheus \
+  prom/prometheus
+  
+docker run -d \
+  -p 3000:3000 \
+  --name=grafana \
+  -v /root/prometheus/grafana-storage:/var/lib/grafana \
+  --restart=always \
+  --name grafana \
+  grafana/grafana
+  
+  
+#tidb 
+curl http://10.83.1.148:9487/metrics
+curl http://10.83.1.74:9487/metrics
+curl http://10.83.1.75:9487/metrics
+
+#pd 
+curl http://10.83.1.148:12379/metrics
+curl http://10.83.1.74:12379/metrics
+curl http://10.83.1.75:12379/metrics
+
+#tikv
+curl http://10.83.1.148:9489/metrics
+curl http://10.83.1.74:9489/metrics
+curl http://10.83.1.75:9489/metrics
+
+#os
+curl http://10.83.1.148:9194/metrics
+curl http://10.83.1.74:9194/metrics
+curl http://10.83.1.75:9194/metrics
+
+curl http://10.120.27.238:9190/metrics
+
+
+10.83.1.148 (root/yealink2019)
+10.83.1.74 (root/Qishan.xianhou)---错误请求所在节点
+10.83.1.75 (root/Qishan.xianhou)
+
+业务节点
+10.83.1.91（root/Yms.yealink）
+10.83.1.92（root/Yms.yealink）
+10.83.1.93（root/Yms.yealink）
+10.83.1.94（root/Yms.yealink)
+
+http://10.200.112.191:9090
+http://10.200.112.191:9091
+
+curl http://10.120.27.238:9190/metrics
+curl http://10.120.27.238:9191/metrics
+
+curl http://10.120.27.238:9487/metrics
+curl http://10.120.27.238:12379/metrics
+curl http://10.120.27.238:9489/metrics
+
+
+curl http://10.83.1.155:9194/metrics
+
+ 
+
+-- 来自哪里 
+gc
+autoid 
+auto analyze 
+
+docker run  -d \
+  -p 9091:9090 \
+  -v /root/prometheus/prometheus2.yml:/etc/prometheus/prometheus.yml  \
+  --restart=always \
+  --name prometheus2 \
+  prom/prometheus
+
+
+docker run  -d \
+  -p 9092:9090 \
+  -v /root/prometheus/prometheus3.yml:/etc/prometheus/prometheus.yml  \
+  --restart=always \
+  --name prometheus3 \
+  prom/prometheus
+  
+
+
+docker run -d \
+  -p 30000:3000 \
+  --name=grafana \
+  -v /root/prometheus/grafana2/data:/var/lib/grafana \
+  --restart=always \
+  --name grafana2 \
+   grafana/grafana:7.5.3
+   
+   
+10.120.27.238     root/yealink@1105
+
+/home/apollo_deploy/globals.yml
+bash /home/apollo_deploy/scripts/install.sh deploy -m ybdp-mq
+ 
+ 
+svc：2000
+avc-1080p:200
+avc-720p:400
+avc-360:800
+
+
+mysql-node1     ansible_ssh_host=10.120.29.177
+mysql-node2     ansible_ssh_host=10.120.29.246
+mysql-node3     ansible_ssh_host=10.120.30.156
+
+[mysql-cluster]
+mysql-node1     ansible_ssh_host=10.120.29.177       lan_ip=10.120.33.121
+mysql-node2     ansible_ssh_host=10.120.29.246       lan_ip=10.120.33.236
+mysql-node3     ansible_ssh_host=10.120.30.156       lan_ip=10.120.33.192
+
+
+centos/Yealinkops1105
+
+root/Devops1105
+
+
+10.70.3.191 Yms@000017
+10.70.3.192 Yms@000001
+10.70.3.193 Yms@000040

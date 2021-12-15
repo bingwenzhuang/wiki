@@ -1,0 +1,153 @@
+ETCD_VER=v3.4.3
+ETCD_BIN=/tmp/test-etcd
+
+GOOGLE_URL=https://storage.googleapis.com/etcd
+GITHUB_URL=https://github.com/etcd-io/etcd/releases/download
+
+DOWNLOAD_URL=${GITHUB_URL}
+
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+rm -rf $ETCD_BIN
+mkdir -p $ETCD_BIN
+
+curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+
+tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C $ETCD_BIN --strip-components=1
+
+https://github.com/etcd-io/etcd/releases/download/v3.4.3/etcd-v3.4.3-linux-amd64.tar.gz
+
+
+1. 正常的启动流程(初始化)
+2. 重启加入集群(1个多个)
+3. 新加入节点
+4. 移除节点，再新加入节点的
+
+etcd raft election + prevote 环境 -- 主要是规避选举期间etcd服务无法时间问题  
+
+raft 
+	follower
+	leader 
+	coordinate
+	learner
+
+静态配置
+服务发现 
+	etcd自发现模式
+	DNS自发现模式
+
+
+
+etcd 关键参数
+	raft 两个timeout设置
+	快照设置 -- 历史版本压缩 -- 消除碎片化 -- 存储配额
+	磁盘 -- etcd io等级 ionice -c2 -n0 -p `pgrep etcd`
+	网络 -- 主节点网络拥堵 sending buffer is full (tc 调整网络带宽和优先级)
+	备份
+	metrics 
+		curl -L http://127.0.0.1:2379/metrics
+	网关/代理
+	存储 BoltDB
+		内存映射文件 -- 文件大，读效率好，可以有效的利用os cache ，无法避免的os cache崩溃后丢失数据
+		写时复制 -- unsafe-no-fsync  通过该参数设置 -- 这个参数3.4.10采用，同时也作用于wal的刷盘上
+	故障
+		主节点故障
+		从节点故障
+		大部分节点故障
+		网络分区故障 -- 拥有大部分节点/拥有小部分节点
+		leader或者其他节点压力过大,导致心跳包没接收到
+	并行IOPS = 串性IOPS*10
+	安全传输加密  cfssl
+		
+		
+		
+etcd 模块划分
+	httpproxy
+	grpc
+	raft 
+	wal -- 这个fsync 有参数吗?
+	apply 
+	mvcc
+	keyindex tree
+	snapshot --   压缩历史版本
+	lease
+
+关键参数	
+	压缩历史版本参数,默认是关闭的
+		auto-compaction-retention
+		auto-compaction-mode 
+	backend 批量提交的间隔和批量量
+	raft election 时间
+	raft 心跳间隔
+	raft advanceTicksForElection 跨中心可以开启
+	wal 文件的大小及个数
+	snap和wal 清理文件频率
+	
+	
+	
+监控指标
+server info
+qps 
+qps latency
+tps 
+tps latency
+raft??
+	propose latency
+	apply log latency
+disk 
+	wal flush latency
+	backend_commit_duration
+	snapshot ?? 
+network	
+	rtt
+	grpc sent bytes
+	grpc received bytes
+
+
+etcd 
+etcd_debugging 
+
+cluster
+debugging -- 测试指标,可能是不准的
+disk
+mvcc
+network
+server
+snap      -- 这个要看下到底是哪个snap -- backend??
+		
+curl http://127.0.0.1:2379/metrics
+
+ETCDCTL_API=3 etcdctl -w table --endpoints=discovery-etcd-2.discovery-etcd:2379,discovery-etcd-1.discovery-etcd:2379,discovery-etcd-0.discovery-etcd:2379 endpoint status
+
+ETCDCTL_API=3 etcdctl -w table --endpoints=discovery-etcd-2.discovery-etcd:2379,discovery-etcd-1.discovery-etcd:2379,discovery-etcd-0.discovery-etcd:2379 snapshot save
+
+
+[{"Endpoint":"etcd-2.etcd:2379","Status":{"header":{"cluster_id":5270411270992877759,"member_id":4451651040965669045,"revision":38,"raft_term":22},"version":"3.4.3","dbSize":40960,"leader":13341274767614692291,"raftIndex":85,"raftTerm":22,"raftAppliedIndex":85,"dbSizeInUse":40960}},{"Endpoint":"etcd-1.etcd:2379","Status":{"header":{"cluster_id":5270411270992877759,"member_id":12443764754123585175,"revision":38,"raft_term":22},"version":"3.4.3","dbSize":45056,"leader":13341274767614692291,"raftIndex":85,"raftTerm":22,"raftAppliedIndex":85,"dbSizeInUse":40960}},{"Endpoint":"etcd-0.etcd:2379","Status":{"header":{"cluster_id":5270411270992877759,"member_id":13341274767614692291,"revision":38,"raft_term":22},"version":"3.4.3","dbSize":45056,"leader":13341274767614692291,"raftIndex":85,"raftTerm":22,"raftAppliedIndex":85,"dbSizeInUse":40960}}]
+
+
+
+--name infra1 --listen-client-urls http://127.0.0.1:2379 --advertise-client-urls http://127.0.0.1:2379 --listen-peer-urls http://127.0.0.1:12380 --initial-advertise-peer-urls http://127.0.0.1:12380 --initial-cluster-token etcd-cluster-1 --initial-cluster infra1=http://127.0.0.1:12380,infra2=http://127.0.0.1:22380,infra3=http://127.0.0.1:32380 --initial-cluster-state new --enable-pprof --logger=zap --log-outputs=stderr
+--name infra2 --listen-client-urls http://127.0.0.1:22379 --advertise-client-urls http://127.0.0.1:22379 --listen-peer-urls http://127.0.0.1:22380 --initial-advertise-peer-urls http://127.0.0.1:22380 --initial-cluster-token etcd-cluster-1 --initial-cluster infra1=http://127.0.0.1:12380,infra2=http://127.0.0.1:22380,infra3=http://127.0.0.1:32380 --initial-cluster-state new --enable-pprof --logger=zap --log-outputs=stderr
+--name infra3 --listen-client-urls http://127.0.0.1:32379 --advertise-client-urls http://127.0.0.1:32379 --listen-peer-urls http://127.0.0.1:32380 --initial-advertise-peer-urls http://127.0.0.1:32380 --initial-cluster-token etcd-cluster-1 --initial-cluster infra1=http://127.0.0.1:12380,infra2=http://127.0.0.1:22380,infra3=http://127.0.0.1:32380 --initial-cluster-state new --enable-pprof --logger=zap --log-outputs=stderr
+
+
+
+
+bash scripts/test-role.sh etcd -e k8s_namespace=test -e etcd_release_name=bo-etcd
+
+
+            # 这样处理的是不对的，会产生大量的拉取数据任务，然后在被取消,无形中破坏数据的完整性
+            # 有可能出现加入过程中失败,但remove还未执行完毕，导致下次节点加入quorum而无法选举出master
+            # 扩缩容的判断 -- 应该是通过预期的statefulset number来判断才对的
+
+            # raft2021/10/25 09:29:06 INFO: d1527afb8a3987ba switched to configuration voters=(2449945284256600923 3458910340287531225 15083253322791618490 17172134781260467415)
+            # 2021-10-25 09:29:06.132310 I | etcdserver/membership: added member 21fff4417342135b [http://bo-etcd-3.bo-etcd:2380] to cluster 9f15022f99006583
+            # 2021-10-25 09:29:06.132382 I | rafthttp: starting peer 21fff4417342135b...
+            # 2021-10-25 09:29:06.132529 I | rafthttp: started HTTP pipelining with peer 21fff4417342135b
+            # 2021-10-25 09:29:06.133952 I | rafthttp: started streaming with peer 21fff4417342135b (writer)
+            # 2021-10-25 09:29:06.136065 I | rafthttp: started streaming with peer 21fff4417342135b (writer)
+            # 2021-10-25 09:29:06.138640 I | rafthttp: started peer 21fff4417342135b
+            # 2021-10-25 09:29:06.138689 I | rafthttp: added peer 21fff4417342135b
+            # 2021-10-25 09:29:06.138819 I | rafthttp: started streaming with peer 21fff4417342135b (stream MsgApp v2 reader)
+            # 2021-10-25 09:29:06.139425 I | rafthttp: started streaming with peer 21fff4417342135b (stream Message reader)
+            # 2021-10-25 09:29:11.138980 W | rafthttp: health check for peer 21fff4417342135b could not connect: dial tcp: lookup bo-etcd-3.bo-etcd on 169.254.25.10:53: no such host
+            # 2021-10-25 09:29:11.139907 W | rafthttp: health check for peer 21fff4417342135b could not connect: dial tcp: lookup bo-etcd-3.bo-etcd on 169.254.25.10:53: no such host

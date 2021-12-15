@@ -1,0 +1,71 @@
+1. new-k8s-app.sh 利用 ansible-galaxy 及role-skeleton 生成模板文件 -->  要去研究下 role-skeleton 结构
+   1.1 先了解 role -- 结合ansible-galaxy来做 
+2. 这两个干嘛用 -- Done
+   openshift python的k8s接口
+   kubernetes-validate 验证k8s yaml文件是否合法
+
+
+
+ansible-galaxy init Skeleton 根据自己的模板生成的
+
+ansible-galaxy install -f -p roles -r requirements.yml
+
+ansible AD-HOC 
+Dry-run
+validate
+
+http://docs.ansible.com/ansible/playbooks_special_topics.html
+
+http://docs.ansible.com/ansible/playbooks_roles.html
+
+http://docs.ansible.com/ansible/latest/modules_by_category.html
+
+ansible [pattern] -m [module] -a "[module options]"
+
+
+ANSIBLE_ROLES_PATH -- 这个变量干嘛用的呢？
+example 找一个简单的类似跑下 
+解剖下redis 单实例的role 
+
+GALAXY_SERVER
+COLLECTIONS_PATHS
+
+
+bash scripts/test-role.sh testapp  -e docker_registry=cr-cn-shenzhen.yealinkops.com    -e k8s_namespace=test
+
+
+https://docs.ansible.com/ansible/latest/modules/list_of_clustering_modules.html
+
+k8s – Manage Kubernetes (K8s) objects
+k8s_auth – Authenticate to Kubernetes clusters which require an explicit login step
+k8s_info – Describe Kubernetes (K8s) objects
+k8s_scale – Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job
+k8s_service – Manage Services on Kubernetes
+
+
+pip install -i http://mirrors.aliyun.com/pypi/simple/ openshift  --trusted-host mirrors.aliyun.com
+pip install -i http://mirrors.aliyun.com/pypi/simple/ hiredis  --trusted-host mirrors.aliyun.com
+
+
+
+pip install openshift 
+python -m pip uninstall pip
+pyrsistent==0.16.0
+
+pip install -i http://mirrors.aliyun.com/pypi/simple/ kubernetes-validate --trusted-host mirrors.aliyun.com
+
+K8S_AUTH_CONTEXT 
+K8S_AUTH_KUBECONFIG 
+namespace 
+validate_certs 
+
+ansible state:
+
+absent
+installed
+latest
+present
+removed
+
+appendonly 该参数的配置问题
+恢复的时候不是通过aof来恢复的。要先关闭aof 然后开启save 

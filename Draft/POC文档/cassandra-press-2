@@ -1,0 +1,51 @@
+结论：
+1. 阿里云的云盘SSD随机读延迟性能比aws gb2差，当文件大小上G后，随机读延迟严重，基本上有90ms延迟(阿里端应该尝试ESSD云盘PL1/2), 600w数据量是个分水岭，不然就得升级磁盘或者扩展节点 
+2. chunk_length_in_kb 的大小影响read性能，从1亿数据，aws环境看快大概有一倍左右
+3. 1亿数据量多个sstable ，随机读取的情况下lcs并未表现出比stcs更好的读性能
+4. cassandra节点可多，每个节点容量规划可少点(对于磁盘不好的情况 -- read)
+
+
+dstat -cd --disk-util --disk-tps
+
+1亿
+time cassandra-stress user profile=./s-stcs-hm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-hm16-singlepost.log -graph file=s-stcs-hm16-singlepost.html title=s-stcs-hm16-singlepost revision=s-stcs-hm16-singlepost
+time cassandra-stress user profile=./s-stcs-hm64.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-hm64-singlepost.log -graph file=s-stcs-hm64-singlepost.html title=s-stcs-hm64-singlepost revision=s-stcs-hm64-singlepost
+time cassandra-stress user profile=./s-lcs-hm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-hm16-singlepost.log -graph file=s-lcs-hm16-singlepost.html title=s-lcs-hm16-singlepost revision=s-lcs-hm16-singlepost
+time cassandra-stress user profile=./s-lcs-hm64.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-hm64-singlepost.log -graph file=s-lcs-hm64-singlepost.html title=s-lcs-hm64-singlepost revision=s-lcs-hm64-singlepost
+
+
+2000w
+time cassandra-stress user profile=./s-stcs-2tm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-2tm16-singlepost.log -graph file=s-stcs-2tm16-singlepost.html title=s-stcs-2tm16-singlepost revision=s-stcs-2tm16-singlepost
+time cassandra-stress user profile=./s-lcs-2tm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-2tm16-singlepost.log -graph file=s-lcs-2tm16-singlepost.html title=s-lcs-2tm16-singlepost revision=s-lcs-2tm16-singlepost
+ 
+
+1000w
+time cassandra-stress user profile=./s-stcs-1tm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-1tm16-singlepost.log -graph file=s-stcs-1tm16-singlepost.html title=s-stcs-1tm16-singlepost revision=s-stcs-1tm16-singlepost
+time cassandra-stress user profile=./s-lcs-1tm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-1tm16-singlepost.log -graph file=s-lcs-1tm16-singlepost.html title=s-lcs-1tm16-singlepost revision=s-lcs-1tm16-singlepost
+ 
+
+500w  
+time cassandra-stress user profile=./s-stcs-5m16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-5m16-singlepost.log -graph file=s-stcs-5m16-singlepost.html title=s-stcs-5m16-singlepost revision=s-stcs-5m16-singlepost 
+time cassandra-stress user profile=./s-lcs-5m16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-5m16-singlepost.log -graph file=s-lcs-5m16-singlepost.html title=s-lcs-5m16-singlepost revision=s-lcs-5m16-singlepost
+ 
+800w
+time cassandra-stress user profile=./s-stcs-8m16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=25 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-8m16-singlepost.log -graph file=s-stcs-8m16-singlepost.html title=s-stcs-8m16-singlepost revision=s-stcs-8m16-singlepost
+ 
+## 调低低并发线程数
+1亿
+time cassandra-stress user profile=./s-stcs-hm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=5 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-hm16-singlepost.log -graph file=s-stcs-hm16-singlepost-5.html title=s-stcs-hm16-singlepost revision=s-stcs-hm16-singlepost
+
+time cassandra-stress user profile=./s-stcs-hm16.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=1 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-hm16-singlepost.log -graph file=s-stcs-hm16-singlepost-1.html title=s-stcs-hm16-singlepost revision=s-stcs-hm16-singlepost
+ 
+
+
+
+time cassandra-stress user profile=/opt/stress/s-stcs-8m16.yaml ops\(insert=1\) n=8000000 cl=LOCAL_QUORUM no-warmup -rate threads=1000 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-8m16.log -graph file=s-stcs-8m16.html title=s-stcs-8m16 revision=s-stcs-8m16
+
+
+time cassandra-stress user profile=/opt/stress/s-lcs-8m16-160.yaml ops\(insert=1\) n=8000000 cl=LOCAL_QUORUM no-warmup -rate threads=1000 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-8m16-160.log -graph file=s-lcs-8m16-160.html title=s-lcs-8m16-160 revision=s-lcs-8m16-160
+time cassandra-stress user profile=/opt/stress/s-lcs-8m16-1024.yaml ops\(insert=1\) n=8000000 cl=LOCAL_QUORUM no-warmup -rate threads=1000 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-lcs-8m16-1024.log -graph file=s-lcs-8m16-1024.html title=s-lcs-8m16-1024 revision=s-lcs-8m16-1024
+
+
+
+

@@ -1,0 +1,70 @@
+https://hub.docker.com/r/proxysql/proxysql/tags
+
+
+# Config file contents referred to as "/path/to/proxysql.cnf"
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    admin_credentials="admin:admin;radmin:radmin"
+    mysql_ifaces="0.0.0.0:6032"
+}
+
+mysql_variables=
+{
+    threads=4
+    max_connections=2048
+    default_query_delay=0
+    default_query_timeout=36000000
+    have_compress=true
+    poll_timeout=2000
+    interfaces="0.0.0.0:6033"
+    default_schema="information_schema"
+    stacksize=1048576
+    server_version="5.5.30"
+    connect_timeout_server=3000
+    monitor_username="monitor"
+    monitor_password="monitor"
+    monitor_history=600000
+    monitor_connect_interval=60000
+    monitor_ping_interval=10000
+    monitor_read_only_interval=1500
+    monitor_read_only_timeout=500
+    ping_interval_server_msec=120000
+    ping_timeout_server=500
+    commands_stats=true
+    sessions_sort=true
+    connect_retries_on_failure=10
+}
+
+docker run -p 16032:6032 -p 16033:6033 -p 16070:6070 -d -v /path/to/proxysql.cnf:/etc/proxysql.cnf proxysql/proxysql
+
+mysql -u admin -padmin -h 127.0.0.1 -P6032 --prompt='Admin> '
+proxysql restart
+proxysql stop
+SHOW DATABASES;
+
+admin_variables: contains global variables that control the functionality of the admin interface.
+mysql_variables: contains global variables that control the functionality for handling the incoming MySQL traffic.
+mysql_servers: contains rows for the mysql_servers table from the admin interface. Basically, these define the backend servers towards which the incoming MySQL traffic is routed.
+mysql_users: contains rows for the mysql_users table from the admin interface. Basically, these define the users which can connect to the proxy, and the users with which the proxy can connect to the backend servers. 
+mysql_query_rules: contains rows for the mysql_query_rules table from the admin interface. Basically, these define the rules used to classify and route the incoming MySQL traffic, according to various criteria (patterns matched, user used to run the query, etc.)
+
+mysql_replication_hostgroups
+
+SELECT * FROM global_variables WHERE variable_name LIKE 'mysql-monitor_%';
+
+
+ 
+LOAD MYSQL QUERY RULES TO RUNTIME;
+SAVE MYSQL QUERY RULES TO DISK;
+LOAD MYSQL SERVERS TO RUNTIME;
+SAVE MYSQL SERVERS TO DISK;
+LOAD MYSQL USERS TO RUNTIME;
+SAVE MYSQL USERS TO DISK;
+LOAD MYSQL VARIABLES TO RUNTIME;
+SAVE MYSQL VARIABLES TO DISK;
+LOAD ADMIN VARIABLES TO RUNTIME;
+SAVE ADMIN VARIABLES TO DISK;
+
+HOW TABLES FROM monitor;

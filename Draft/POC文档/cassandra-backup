@@ -1,0 +1,75 @@
+# backup 的参数
+
+云存储配置 
+type  ## 存储类别 oss，s3
+region 
+bucket
+accessid
+accesskey
+upload  ## 是否上传  上传的路径写死 
+ns
+host -- 留着 但默认都是127.0.0.1 
+port -- cassandra   
+username -- cassandra 
+password -- cassandra 
+keyspaces -- all  -- 也是
+tables  -- all  -- 只有制定keyspace 才能执行tables 
+jmxusername
+jmxpassword
+jmxport  
+tag  --  备份标签  -- 默认生成 
+
+
+backup方法 
+  getkeyspaces
+  makemetadata ???
+  makesnapshot 
+  clearsnapshot 
+  findsnapshot 
+  
+ chown -R root.root operation.log
+  
+  
+keyspace_list = keyspaces.split(',')
+
+"bk_%s" % datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+  
+
+host = '127.0.0.1'
+
+          - command:
+      - command:
+        - bk_tidb_user_seq.py
+        - --host=common-dbhook
+        - --port=9436
+        - --user=backupUser
+        - --password=WWVhbGluazExMDViYWNrdXB1c2Vy
+        - --ns=tidb
+        - --type=oss
+        - --region=cn-shanghai
+        - --bucket=tidb-backup-prod-cn-shanghai
+        - --accessid=TFRBSTRGenJyQmY4dXh3ZVJoRnpnelVD
+        - --accesskey=b3RNTmxIOGd1Tm1ZdGZaRTBGM1BnRHNDUXBGcGoz
+        - --upload
+			
+			
+			
+write_sql_file(filename,"use " + seq_sql['seqschema'] + ";" )
+write_sql_file(filename,"%s;\n\r" % row['Create Sequence
+ 
+python3 /cass_backup.py --user=cassandra --password=Y2Fzc2FuZHJh --jmxusername=cassandra --jmxpassword=Y2Fzc2FuZHJh --ns=bowenz --type=oss --region=cn-shenzhen --bucket=tidb-backup-test --accessid=TFRBSTRGeTJEZExVRko1czVpa3ZTRld3 --accesskey=alVnQXlOdmRWSVZCZ2xDalhWZGs5ODdsSXVjYThq --upload
+python3 /cass_restore.py --user=cassandra --password=Y2Fzc2FuZHJh  --type=oss --region=cn-shenzhen --bucket=tidb-backup-test --accessid=TFRBSTRGeTJEZExVRko1czVpa3ZTRld3 --accesskey=alVnQXlOdmRWSVZCZ2xDalhWZGs5ODdsSXVjYThq --key=bowenz/cassandra-0/bk_all_20210625090039.tar.gz
+
+
+python3 /cass_ops.py backup --container=cassandra --keyspaces=diss --ns=bowenz --type=oss --region=cn-shenzhen --bucket=tidb-backup-test --sts=cass-press  --secret=cass-secret --protocol-version=3
+
+python3 /cass_ops.py restore --host=cassandra-0.cassandra.bowenz.svc.cluster.local --ns=bowenz --keyspaces=ypush --type=oss --region=cn-shenzhen --bucket=tidb-backup-test --key=bowenz/cassandra-2/bk_all_20210624070935.tar.gz --secret=cass-secret --protocol-version=3
+
+python3 /cass_ops.py init --host=cassandra-0.cassandra.bowenz.svc.cluster.local --ns=bowenz --sts=cassandra  --secret=cass-secret --protocol-version=3 --pwauth
+
+nodetool -u cassandra -pw cassandra status
+sstableloader('-v','-u',self.user,'-pw',self.password,'-p',self.port,'-d',self.host,"%s/%s/%s/%s" % (self.dir, self.restore_dirname, keyspace,table))
+sstableloader -v -u cassandra -pw cassandra -p 9042 -d cassandra-0 /opt/cassandra/data/bk_all_20210622110922/test/metrics
+
+bowenz/cassandra-2/bk_all_20210624070935.tar.gz,bowenz/cassandra-2/bk_all_20210624070936.tar.gz,bowenz/cassandra-2/bk_all_20210621070936.tar.gz
+ 

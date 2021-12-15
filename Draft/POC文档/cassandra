@@ -1,0 +1,234 @@
+gc_grace_seconds -- 数据僵死问题的修复
+
+
+
+-- table key and row caches -- 这个是写的还是读的， 什么时候会用到呢
+saved_caches_directory
+-- 压缩相关配置 LCS STCS TWCS DTCS
+snapshot_before_compaction
+concurrent_compactors
+compaction_throughput_mb_per_sec
+
+disk_access_mode: mmap
+
+墓碑引起的两个问题:
+1. 存储空间并未缩小
+2. 查询效率问题
+
+## 重要参数还要过一篇
+监控先搞吧 == 不然压测没意义
+1. 表级别的metrics 
+	堆内，堆外内存使用
+	压缩情况
+	读写延迟
+	flush情况
+	布尔情况
+	墓碑情况
+	缓存情况
+2. keyspaces -- 少
+3. 线程池metrics
+4. client 请求
+5. 缓存
+6. streaming 
+7. 压缩
+8. commitlog
+9. 存储
+10. 提交转移
+11. sstable
+12. GC
+
+
+目前几个问题:
+0. bloom_filter_fp_chance  的选择 nodetool scrub nodetool upgradesstables -a
+1. 内存的分配， 堆内，堆外  -- memtable_allocation_type 这个参数是关键 -- 这个估计得通过压测才能知道一个好坏
+2. cache (分区key，row cache) 怎么用，如何分配 -- 全局的分配 、 (每个表的设置问题) --  已经有结论
+3. GC == 已经有结论 cms g1
+4. 读修复 disable - table 级别设置 
+5. 数据设计模型 -- 已经有结论
+6. 复制和一致性 -- 已经有结论
+7. 写提交切换设置(hint handoff) -- 也有，需详细到参数 -- 保留默认设置
+8. 墓碑问题(压缩 -- ) -- 也是 3 天就可以 table级别设置，每个都得设置  -- 根据情况，对于性能要求高，并且可容忍脏数据可以设置为0
+9. sstable 压缩  -- 还没有 压缩问题还没看 -- 压缩的算法，压缩的频率
+10. 优化退出，需要记性flush disk -- pod 退出问题  通过配置lifecycle nodetool drain 
+11. 健康监测 -- nodetool status  -- pod 问题 ready-probe.sh -- 采用跨中心的这个是不一样的
+12. 一致性等级的设置 -- 每个sql语句的。 -- 一般通过driver 设置的 LOCAL_QUORUM ()
+13. tracing (已有)和slow问题 (没有)
+14. 压测方式 -- 未有结论
+15. seed 节点一定需要包含sts index-0和index-max的节点
+16. add and remove node操作 -- 这个目前还不清楚 -- 可以手动实下
+17. 寻找合适的cassandra docker 完成
+	1. cassandra.yaml (有处理方式了 -- 统一采用这种方式处理避免重复)
+	2. jvm.options --  
+		gc 日志默认路径 ${CASSANDRA_LOG_DIR}/gc.log 
+		MAX_HEAP_SIZE  -- 最大heap 和启示heap大小
+		HEAP_NEWSIZE  -- 年轻代的大小
+		JVM_OPTS=-XX:+UseCondCardMark -- 只能通过它来覆盖  cms gc
+		-Dcassandra.jmx.remote.port
+		LOCAL_JMX
+		MALLOC_ARENA_MAX
+		都得更改啊 cassandra-env.sh (通过修改该脚本实现吧)/jvm.options
+	3. cassandra-rackdc.properties -- 按照原来的处理方式
+	/opt/cassandra/conf/cassandra-env.sh
+	4. jmx 设置
+	5. 日志 gc ，级别
+	6. 至少需要两个边车，一个tail gc 日志， tail debug日志
+18. point-in-time recovery.
+19. rack 设计不合理性
+20. 表过多，模型设计有问题. 无论是否使用该表都会有1m的情况用于存储表元数据信息。 -- 危害等级高
+21. cronjob 
+    backup 
+	定时修复
+22. 数据迁移的方式
+23. password 需要看下，如何设置 --  节点间SSL加密(dc 之间的加密，后面再看下)
+last. 异构k8s 
+24. 先确认需要监控哪些指标，然后再考虑压测？
+25. 索引
+	常规二级索引(哈希)
+	sstable-attached二级索引(b+tree)
+	性能问题
+		实时事务查询
+		昂贵的分析查询
+	create index if not exists index_name on tablename(column);
+	create custom index if not exists index_name on tablename(column) using 'org.apache.cassandra.index.sasi.SASIIndex' with options='';
+26. Spark-Cassandra
+27. custom_tracing_class cassandra tracing 
+
+GossipingPropertyFileSnitch
+cassandra.consistent.rangemovement
+
+cr-dev.yealinkops.com/3rdparty/cassandra:3.11.8-v0.0.1
+
+Cassandra性能优化主要着手点：
+
+禁用Read Repair
+调整Compression
+调整Key Cache 和 Row Cache
+调整JVM Heap
+优化落脚点：
+
+配置文件cassandra.yaml
+启动脚本jvm.options
+应用使用CassandraTemplate和Session的方法
+ 
+根据实战经验看，集群优化要点是减少GC暂停时间，提高服务器CPU利用率。
+
+##
+CREATE TABLE ypush.ypush_meeting_messages (
+    pk__que_id text,
+    pk__seq_id bigint,
+    content text,
+    content_type bigint,
+    msg_id text,
+    pk__create_time bigint,
+    stime bigint,
+    PRIMARY KEY (pk__que_id, pk__seq_id)
+) WITH CLUSTERING ORDER BY (pk__seq_id ASC)
+    AND bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND crc_check_chance = 1.0
+    AND dclocal_read_repair_chance = 0
+    AND default_time_to_live = 60
+    AND gc_grace_seconds = 0
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99PERCENTILE';
+	
+cqlsh -e ''
+
+
+studentA
+	(column=age, value=18, timestamp=xxx)
+	(column=name, value='xxx', timestamp=xxx)
+	(column=node, value='xxx', timestamp=xxx)
+	
+john.doe last_login
+	(column=key,value=last_login,timestamp=xxx)
+	(column=key,value=married_to,timestamp=xxx)
+	(column=value,value=x1,timestamp=xxx)
+	(column=value,value=x2,timestamp=xxx)
+	
+	
+SSTabledump /Users/alain/.ccm/Cassa-3.7/node1/data/tlp_lab/tombstones-c379952033d311e6aa4261d6a7221ccb/mb-6-big-Data.db
+SSTabledump /Users/alain/.ccm/Cassa-3.7/node1/data/tlp_lab/tombstones-c379952033d311e6aa4261d6a7221ccb/mb-7-big-Data.db
+SSTablemetadata /Users/alain/.ccm/Cassa-3.7/node1/data/tlp_lab/tombstones-c379952033d311e6aa4261d6a7221ccb/mb-14-big-Data.db
+
+
+system_traces.session
+system_traces.events
+
+com.datastax.driver.core.QueryLogger.SLOW
+com.datastax.driver.core.QueryLogger.NORMAL
+
+nodetool ring test_keyspace
+nodetool describering test_keyspace
+nodetool repair -full tlp_stress
+
+ccm create test -v 3.11.8 -n 3 --vnodes 1  --root  -s 
+
+CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class' : 'NetworkTopologyStrategy', 'DC1' : 3 };
+CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class' : 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor' : 3 };
+
+CREATE TABLE user_attr(
+  username varchar,
+  key varchar,
+  value varchar,
+  PRIMARY KEY(username,key)
+);
+INSERT INTO user_attr(username,key,value)VALUES('john.doe','married_to','janedoe');
+INSERT INTO user_attr(username,key,value)VALUES('john.doe','last_login','2014-01-04T12:00:00');
+INSERT INTO user_attr(username,key,value)VALUES('anna','last_login','2014-04-03T13:00:00');
+
+
+CREATE TABLE metrics (
+  id text,
+  type text,
+  metric text,
+  value text,
+  PRIMARY KEY ((id,type), metric)
+);
+
+insert into metrics(id,type,metric,value) values('12345', 'idNumber', 'cnt', '2');
+insert into metrics(id,type,metric,value) values('12345', 'idNumber', 'max', '10');
+insert into metrics(id,type,metric,value) values('12345', 'idNumber', 'sum', '15');
+insert into metrics(id,type,metric,value) values('12345', 'idNumber', 'avg', '7.5');
+insert into metrics(id,type,metric,value) values('12345', 'idNumber', 'distinct', '2');
+
+insert into metrics(id,type,metric,value) values('12346', 'idNumber', 'cnt', '2');
+insert into metrics(id,type,metric,value) values('12346', 'idNumber', 'max', '10');
+insert into metrics(id,type,metric,value) values('12346', 'idNumber', 'sum', '15');
+insert into metrics(id,type,metric,value) values('12346', 'idNumber', 'avg', '7.5');
+insert into metrics(id,type,metric,value) values('12346', 'idNumber', 'distinct', '2');
+
+
+导入命令 -- 哪个下载?
+dsbulk 
+https://github.com/datastax/dsbulk/releases/download/1.8.0/dsbulk-1.8.0.tar.gz
+
+http://10.200.112.191:8081/prometheusMetrics
+
+python spreaper.py --reaper-host=cassandra-reaper.dev.cn-shanghai.yealinkops.com --reaper-port=80 login admin
+python spreaper.py --reaper-host=cassandra-reaper.dev.cn-shanghai.yealinkops.com --reaper-port=80 list-snapshots k8demo
+python spreaper.py --reaper-host=cassandra-reaper.dev.cn-shanghai.yealinkops.com --reaper-port=80 --name=bowenztest2 --owner=bowenztest2 --cause=bowenztest2 take-snapshot k8demo
+
+
+CREATE KEYSPACE IF NOT EXISTS reaper_db WITH replication = {'class' : 'NetworkTopologyStrategy', '$(CASSANDRA_DC)' : $(REP_FACTOR) };
+
+CREATE KEYSPACE IF NOT EXISTS cycling WITH replication = {'class' : 'NetworkTopologyStrategy', 'DC1' : 3 };
+
+ALTER KEYSPACE system_distributed WITH REPLICATION = {  'class' : 'NetworkTopologyStrategy', 'DC1':3} AND DURABLE_WRITES = true ;
+ALTER KEYSPACE system_auth WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'DC1' : 3 };
+
+nodetool -u cassandra -pw cassandra status
+nodetool -u cassandra -pw cassandra refresh
+
+sstableloader -u cassandra -pw cassandra -d localhost bkp-17012/keyspace1/counter1
+sstableloader -v -u cassandra -pw cassandra -d 10.120.28.165 /root/test/cassandra/apache-cassandra-3.11.10/bin/keyspace1/standard1
+nodetool refresh
+
+
+echo -n cassandra |base64

@@ -1,0 +1,41 @@
+MOLAP多维: Druid，Kylin，Doris 
+ 适用于查询场景相对固定并且对查询性能要求非常高的场景
+ROLAP关系：Presto，Impala，GreenPlum，Clickhouse(PB)，Elasticsearch，Hive，Spark SQL，Flink SQL,
+HOLAP混合：
+
+kudu
+Pinot 
+
+固定查询
+探索性查询
+
+数据仓库压测方案
+	TPC-DS - 星型\雪花型
+	
+	
+	
+BI产品
+	Cboard,superset,metabase,Open Mining,dataease
+	
+
+以下三种放大的区别 -- 放大的原因和平衡
+LSM 读放大/写放大/空间放大    
+B+tree 读放大/写放大/空间放大 
+
+
+LSM 
+	size-tiered策略
+	leveled策略
+	
+	
+	
+	
+	http://thanos-query-local.ali-cn-shanghai.staging.ylops.com
+	http://thanos-query-local.ali-eu-central-1.staging.ylops.com
+	
+	
+	
+(sum(rate(container_cpu_usage_seconds_total{namespace=~"(staging-ybdp|staging-ybdp-ynn)",k8s_region=~"cn-shanghai",container="tikv"}[2m])) by (region,namespace,pod) 
+/ (sum(container_spec_cpu_quota{namespace=~"(staging-ybdp|staging-ybdp-ynn)",k8s_region=~"cn-shanghai",container="tikv"}/100000) by (region,namespace,pod)) * 100)
+* on(region,namespace,pod) group_left kube_pod_labels{k8s_region=~"cn-shanghai",namespace=~"(staging-ybdp|staging-ybdp-ynn)",label_app_kubernetes_io_instance=~"(common|ynn)",label_app_kubernetes_io_component="tikv"}
+

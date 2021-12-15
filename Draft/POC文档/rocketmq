@@ -1,0 +1,285 @@
+## 复习 
+### 搭建
+### 
+ProducerGroup  - 多个 Producer
+	发送模式
+		同步发送 - 需broker ack -- 会轮询到下一个broker
+		异步发送 - 需broker ack -- 不是高可用
+		顺序发送 - 需broker ack??? 不确认
+		单向发送 - 不需要
+ConsumerGroup  - Consumer  
+	消费模式
+		拉取消费
+		推动消费 实时性较高
+	消费方式 
+		集群消费 Clustering Consumerr实例平均分摊消息
+		广播消费 Broadcasting Consumer实例都接收全量的消息
+	消费姿势
+		Consumer先Pull消息到本地，消费完成后，才向服务器返回ack
+Message(ID, key,Tag)
+	普通顺序消息 同一个消息队列是有序的(Topic 分区问题)
+	严格顺序消息 整体是有序
+	事务消息 指应用本地事务和发送消息操作可以被定义到全局事务中，要么同时成功，要么同时失败 -- 指本地存储和生产者的事务？
+	定时消息 - 延迟队列 - SCHEDULE_TOPIC_XXXX (定时消息会在第一次写入和调度写入真实topic时都会计数，因此发送数量、tps都会变高)
+	消费重试 - %RETRY%+consumerGroup -- 重试队列 -- 对象是消费组
+		消息不符合业务场景  -- 如话费充值，但号码已经注销了
+		应用端依赖不可用问题
+	消息重投递
+		问题： 消息重复
+		retryTimesWhenSendFailed:同步发送失败重投次数，默认为2，因此生产者会最多尝试发送retryTimesWhenSendFailed + 1次。
+		retryTimesWhenSendAsyncFailed:异步发送失败重试次数，异步重试不会选择其他broker，仅在同一个broker上做重试，不保证消息不丢。 -- 仅在一个broker上，可能会导致消息丢失 ，比如改broker 挂了
+		retryAnotherBrokerWhenNotStoreOK:消息刷盘（主或备）超时或slave不可用（返回状态非SEND_OK），是否尝试发送到其他broker，默认false。十分重要消息可以开启
+Topic  - 多个 Broker (Message Queue) 和 Topic  - 多个 Message Queue
+	消息逻辑分类，订阅最小单元单位
+Broker
+	存储，转发(也存储消息相关的元数据，如消费组，消费进度偏移和队列消息)
+	消息过滤功能 - Consumer端订阅消息时再做消息过滤的
+	刷盘模式
+	双同步 -- 3.0版本开始支持
+	回溯消费
+	模块
+		remoting module 整个Broker的实体，负责处理来自clients端的请求 -- request
+		client manager 负责管理客户端(Producer/Consumer)和维护Consumer的Topic订阅信息 -- infomation
+		Store Service：提供方便简单的API接口处理消息存储到物理硬盘和查询功能
+		HA Service：高可用服务，提供Master Broker 和 Slave Broker之间的数据同步功能 (BrokerName，不同的BrokerId 来定义，BrokerId为0表示Master，非0表示Slave -- 只有BrokerId=1的从服务器才会参与消息的读负载)
+		Index Service：根据特定的Message key对投递到Broker的消息进行索引服务，以提供消息的快速查询  -- store service index ??
+Name server(跟每个broker保持交流，每台都有完整的路由信息--理论上)
+	路由服务 -- Topic 对应broker ip -- Name server 相互独立不互换消息
+流量控制
+	生产(注意，生产者流控，不会尝试消息重投。)
+		commitLog文件被锁时间超过osPageCacheBusyTimeOutMills时，参数默认为1000ms，返回流控。
+		开启transientStorePoolEnable == true，且broker为异步刷盘的主机，且transientStorePool中资源不足，拒绝当前send请求，返回流控
+		broker每隔10ms检查send请求队列头部请求的等待时间，如果超过waitTimeMillsInSendQueue，默认200ms，拒绝当前send请求，返回流控
+		broker通过拒绝send 请求方式实现流量控制
+	消费
+		消费者本地缓存消息数超过pullThresholdForQueue时，默认1000。
+		消费者本地缓存消息大小超过pullThresholdSizeForQueue时，默认100MB。
+		消费者本地缓存消息跨度超过consumeConcurrentlyMaxSpan时，默认2000。
+死信队列
+	死信队列用于处理无法被正常消费的消息。当一条消息初次消费失败，消息队列会自动进行消息重试；达到最大重试次数后，若消费依然失败，则表明消费者在正常情况下无法正确地消费该消息，此时，消息队列 不会立刻将消息丢弃，而是将其发送到该消费者对应的特殊队列中
+	RocketMQ将这种正常情况下无法被消费的消息称为死信消息（Dead-Letter Message），将存储死信消息的特殊队列称为死信队列（Dead-Letter Queue）。在RocketMQ中，可以通过使用console控制台对死信队列中的消息进行重发来使得消费者实例再次进行消费
+ 
+ 
+部署形态
+	1. name server
+	2. broker startup
+	3. create topic
+	4. product
+	5. consumer
+	
+	
+消息存储结构(Broker端的后台服务线程—ReputMessageService不停地分发请求并异步构建ConsumeQueue（逻辑消费队列）和IndexFile（索引文件）数据)
+	commitlog      消息主体以及元数据的存储主体，存储Producer端写入的消息主体内容,消息内容不是定长的
+				   读取消息内容时候会产生较多的随机访问读取，严重影响性能
+				   IO调度算法 SSD Deadline
+	consumeQueue   ConsumeQueue（逻辑消费队列）作为消费消息的索引，保存了指定Topic下的队列消息在CommitLog中的起始物理偏移量offset，消息大小size和消息Tag的HashCode值
+				   Consumequeue文件可以看成是基于topic的commitlog索引文件，故consumequeue文件夹的组织方式如下：topic/queue/file三层组织结构，具体存储路径为：$HOME/store/consumequeue/{topic}/{queueId}/{fileName}
+				   8字节的commitlog物理偏移量、4字节的消息长度、8字节tag hashcode
+				   顺序读取
+	IndexFile	   IndexFile（索引文件）提供了一种可以通过key或时间区间来查询消息的方法。Index文件的存储位置是：$HOME \store\index${fileName}，文件名fileName是以创建时的时间戳命名的，固定的单个IndexFile文件大小约为400M，一个IndexFile可以保存 2000W个索引，IndexFile的底层存储设计为在文件系统中实现HashMap结构，故rocketmq的索引文件其底层实现为hash索引
+消息刷盘
+	同步
+	异步
+通信机制
+	Broker启动后需要完成一次将自己注册至NameServer的操作；随后每隔30s时间定时向NameServer上报Topic路由信息
+	消息生产者Producer作为客户端发送消息时候，需要根据消息的Topic从本地缓存的TopicPublishInfoTable获取路由信息。如果没有则更新路由信息会从NameServer上重新拉取，同时Producer会默认每隔30s向NameServer拉取一次路由信息
+	消息生产者Producer根据2）中获取的路由信息选择一个队列（MessageQueue）进行消息发送；Broker作为消息的接收者接收消息并落盘存储。
+	消息消费者Consumer根据2）中获取的路由信息，并再完成客户端的负载均衡后，选择其中的某一个或者某几个消息队列来拉取消息并进行消费
+	
+####################################################
+
+ops:
+	1. topic 删除
+	2. topic 带tag删除
+	3. 跳过无法重复消费的消息
+	4. 死信队列处理
+	
+	
+1. 掌握RocketMQ生产者高级用法，轻松解决消息同步/异步、延迟、顺序等问题
+2. 掌握RocketMQ消费者高级用法，真正理解Offset存储机制、消费端重试、幂等策略
+3. 深入理解RocketMQ核心原理，进阶掌握高可用机制、协调服务，刷盘赋值策略
+
+
+# rocketmq 体系结构
+producer
+nameserver
+broker - master(0) slave(非0) 只有brokerid=1的slave才能参与消息的负载均衡
+    remoting module
+    client manager - topic 订阅管理
+    store service - 
+    ha service
+    index service - querymsgbymsgkey
+consumer
+
+
+消息存储
+    commitlog - 随机读取(主要是读取消息内容,SSD IO算法 Deadline -- 用于提升随机读) 
+    consumequeue - 基于topic的索引文件 - 顺序读取index from disk
+    indexfile - 基于key 或者 时间的索引文件
+    采用MappedByteBuffer对文件进行读写 - 采用定长结构来存储,方便一次性将整个文件映射到内存
+    同步/异步刷盘
+通信机制(sync,async,oneway)
+    NameServer
+    Broker(Master/Slave)
+        30s向namesever上报Topic信息
+    Producer
+        本地Topic路由
+        30s向nameserver拉去一次路由信息
+    Consumer
+		消费消息幂等
+		消息过滤
+			by Topic and tag
+			SQL02过滤方式
+负载均衡
+	producer: latencyFaultTolerance
+	consumer: 默认是平均
+事务消息
+
+
+#################################
+1. 搭建单机模式
+2. 理顺参数
+3. 理顺消息类型
+4. 理顺消费模式
+5. 搭建集群模式
+	5.1 broker如何故障转移,引入第三方包
+6. 明确修改影响
+7. 输出规范
+8. 输出metrics
+
+长度限制
+topic
+product
+consumer
+
+Tag:则用来区分同一个Topic下相互关联的消息，例如全集和子集的关系、流程先后的关系
+消息重复的可能
+	发送时重复(生产)
+	投递时重复(消费)
+	负载均衡时重复
+消息幂等 -- 通过唯一的key
+
+常规操作
+1. 查询集群列表
+2. 查询topic列表
+	2.1 查询topic对应的consumerqueue情况
+	2.2 区分系统topic
+		SCHEDULE_TOPIC_XXXX 
+			延迟消息
+			消息重试: RocketMQ对于重试消息的处理是先保存至Topic名称为“SCHEDULE_TOPIC_XXXX”的延迟队列中，后台定时任务按照对应的时间进行Delay后重新保存至“%RETRY%+consumerGroup”的重试队列中。
+		%RETRY%+consumerGroup 重试队列,存储无法消费的消息
+		RMQ_SYS_TRANS_HALF_TOPIC 没有提交的事务消息 -- 定时任务拉取消息，回到生产者check事务状态  -- 回查次数为15次
+		OP topic 用于对应事务的提交和回滚记录
+		RMQ_SYS_TRACE_TOPIC 跟踪topic
+3. 查询product列表
+4. 查询consumer列表, 区分是集群消费还是广播消费
+5. 查询broker列表、状况和配置
+6. 设置消费者的偏移量
+7. 
+
+
+1. topic 
+2. producter
+3. consumer 
+4. broker 
+5. message
+6. nameserver 
+
+有生产消息，但没有消费者的
+对于异步发送消息不是高可用的
+
+- accessKey: cloud_adm
+  secretKey: 123456789
+  admin: true
+
+
+./mqadmin updateTopic -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster -p 6 -r 8 -w 8 -t STORAGE-UPLOAD-DATA-ANALYZER
+./mqadmin updateTopic -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster -p 6 -r 8 -w 8 -t STORAGE-UPLOAD-CONFERENCE-MANAGER
+./mqadmin updateTopic -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster -p 6 -r 8 -w 8 -t STORAGE-SCAN-CONFERENCE-MANAGER
+./mqadmin updateTopic -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster -p 6 -r 8 -w 8 -t WEBINAR
+./mqadmin updateTopic -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster -p 6 -r 8 -w 8 -t STORAGE-UPLOAD-USER-MANAGER
+
+./mqadmin updateTopic -n "connect-mqnamesrv-0.connect-mqnamesrv:9476;connect-mqnamesrv-1.connect-mqnamesrv:9476" -c YBDPConnectCluster -p 6 -r 4 -w 4 -t vote
+
+
+./mqadmin TopicList -n "connect-mqnamesrv-0.connect-mqnamesrv:9476;connect-mqnamesrv-1.connect-mqnamesrv:9476" | grep vote
+./mqadmin TopicList -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" | grep WEBINAR
+
+./mqadmin TopicList -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+./mqadmin topicStatus -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -t testtopic
+./mqadmin topicRoute -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -t testtopic
+./mqadmin statsAll -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+./mqadmin clusterList -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+
+./mqadmin clusterList -n "connect-mqnamesrv-0.connect-mqnamesrv:9476;connect-mqnamesrv-1.connect-mqnamesrv:9476" 
+
+
+
+./mqadmin producerConnection -n 127.0.0.1:9876 -t benchxxx -g benchmark_producer
+./mqadmin sendMessage -n 127.0.0.1:9876 -t bowenz -k test -p test-body  -c bowenz 
+./mqadmin consumeMessage -n 127.0.0.1:9876 -t bowenz -b bowen-001 -c 3 -g Consumer_bowenz
+./mqadmin TopicList -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+./mqadmin brokerConsumeStats -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -b broker-a
+./mqadmin statsAll -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+./mqadmin getNamesrvConfig -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" 
+./mqadmin getBrokerConfig -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster
+./mqadmin getAccessConfigSubCommand -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -c YBDPNotifyCluster
+./mqadmin consumerConnection -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -g BE_CONFERENCE_PARTY_CONSUMER
+./mqadmin consumerProgress -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -g BE_CONFERENCE_PARTY_CONSUMER
+./mqadmin consumerStatus -n "notify-mqnamesrv-0.notify-mqnamesrv:9476;notify-mqnamesrv-1.notify-mqnamesrv:9476" -g BE_CONFERENCE_PARTY_CONSUMER
+
+
+## 上海uss数据库storage
+INSERT INTO uss_credential (id,access_key,access_secret,biz,bucket,token,process_bucket,expiration,create_time,modify_time)VALUES ('13','1bd0df6f720448d28cb568093595d006','DATA-ANALYZER','DATA-ANALYZER','uss-common-cn-shanghai','ccb978f7ee5a4941991b2b24d39bb54c','uss-common-cn-shanghai',NULL,NULL,NULL);
+## 欧洲uss数据库storage
+INSERT INTO uss_credential (id,access_key,access_secret,biz,bucket,token,process_bucket,expiration,create_time,modify_time)VALUES ('13','1bd0df6f720448d28cb568093595d006','DATA-ANALYZER','DATA-ANALYZER','uss-common-eu-west-1','ccb978f7ee5a4941991b2b24d39bb54c','uss-common-eu-west-1',NULL,NULL,NULL);
+
+./mqadmin consumerProgress -n "ynn-mqnamesrv-0.ynn-mqnamesrv:9476;ynn-mqnamesrv-1.ynn-mqnamesrv:9476" -g g2r_binlog_cn-shanghai
+
+./mqadmin statsAll -n "ynn-mqnamesrv-0.ynn-mqnamesrv:9476;ynn-mqnamesrv-1.ynn-mqnamesrv:9476" 
+./mqadmin brokerConsumeStats -n "ynn-mqnamesrv-0.ynn-mqnamesrv:9476;ynn-mqnamesrv-1.ynn-mqnamesrv:9476" -b 127.0.0.11:10911
+
+./mqadmin TopicList -n "ynn-mqnamesrv-0.ynn-mqnamesrv:9476;ynn-mqnamesrv-1.ynn-mqnamesrv:9476" 
+
+./mqadmin TopicList -n "notify-mqnamesrv.staging-ybdp.svc:9476" 
+
+notify-mqbroker-a-0.notify-mqbroker-a.staging-ybdp.svc.cluster.local
+
+##  仅适用于机械硬盘和无slave情况
+useReentrantLockWhenPutMessage：false
+flushCommitLogTimed: true
+flushIntervalCommitLog: 2000
+flushCommitLogThoroughInterval: 20000
+transientStorePoolEnable: true
+commitIntervalCommitLog: 1000
+osPageCacheBusyTimeOutMills: 60000
+waitTimeMillsInSendQueue： 10000
+useEpollNativeSelector: true
+flushIntervalConsumeQueue: 2000
+
+
+./mqadmin TopicList -n "127.0.0.1:9076" 
+./mqadmin statsAll -n "127.0.0.1:9076"
+./mqadmin topicRoute -n "127.0.0.1:9076"
+./mqadmin topicStatus -n "127.0.0.1:9076"
+./mqadmin topicClusterList -n "127.0.0.1:9076" 
+./mqadmin brokerStatus -n "127.0.0.1:9076"  -b 10.70.0.180:9462
+./mqadmin getBrokerConfig -n "127.0.0.1:9076"  -b 127.0.0.1:9462
+
+./mqadmin clusterList -n "127.0.0.1:9076" 
+./mqadmin topicList -n "127.0.0.1:9076" 
+
+ 
+docker run -d -e "JAVA_OPTS=-Drocketmq.namesrv.addr=10.200.112.191:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false" -p 8080:8080 -t apacherocketmq/rocketmq-console:2.0.0
+
+ 
+
+docker run  -d \
+  -p 9090:9090 \
+  -v /root/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml  \
+  --restart=always \
+  --name prometheus \
+  prom/prometheus
+
+cloud_adm
+123456789

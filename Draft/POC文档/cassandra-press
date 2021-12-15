@@ -1,0 +1,50 @@
+-- cassandra 压测
+
+资源
+  4c8g
+
+目标.
+	- jvm 堆内堆外性能差异
+	- jvm cms 和 g1 性能差异
+	- 表墓碑多不同压实策略性能差异
+	- 一致性等级性能差异
+	- 单中心和多中心性能差异
+	- 大的分区性能差异(-- 针对不合理的分区设置表 - 暂时可以不测)
+	- 字段多寡和字段大小性能差异
+	- 不同环境之间性能差异
+	
+ 
+	 
+	 
+	- jvm 堆内堆外性能差异 
+	- 表墓碑多不同压实策略性能差异
+	- 大的分区性能差异(-- 针对不合理的分区设置表 - 暂时可以不测)
+ 
+	
+100000000  1亿   15.5G
+50000000   5000w  8G
+##
+20000000   2000w  
+10000000   1000w  
+5077052    
+
+## duration=5m
+## n=100000000 
+#  time cassandra-stress user profile=./s-stcs.yaml ops\(insert=1\) n=100000000 cl=LOCAL_QUORUM no-warmup -rate threads=50 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-insert.log -graph file=s-stcs-insert.html title=s-stcs-insert revision=s-stcs-insert
+
+time cassandra-stress user profile=./s-stcs.yaml ops\(insert=1\) n=50000000 cl=LOCAL_QUORUM no-warmup -rate threads=1000 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-insert1.log -graph file=s-stcs-insert1.html title=s-stcs-insert1 revision=s-stcs-insert1
+
+time cassandra-stress user profile=./s-stcs.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=50 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-singlepost.log -graph file=s-stcs-singlepost.html title=s-stcs-singlepost revision=s-stcs-singlepost
+
+
+#  time cassandra-stress user profile=./s-stcs.yaml ops\(singlepost=1\) duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=50 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-singlepost.log -graph file=s-stcs-singlepost.html title=s-stcs-singlepost revision=s-stcs-singlepost
+
+#  cassandra-stress user profile=./s-stcs.yaml ops\(timeline=1\)  duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=50 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-timeline.log -graph file=s-stcs-timeline.html title=s-stcs-timeline revision=s-stcs-timeline
+
+#  cassandra-stress user profile=./s-stcs.yaml ops\(singlepost=2,timeline=1,insert=1\)  duration=5m cl=LOCAL_QUORUM no-warmup -rate threads=50 -mode native cql3 user=root password=cassandra -node cass-press-0.cass-press.bowenz.svc.cluster.local,cass-press-1.cass-press.bowenz.svc.cluster.local,cass-press-2.cass-press.bowenz.svc.cluster.local -log file=/tmp/s-stcs-mixed.log -graph file=s-stcs-mixed.html title=s-stcs-mixed revision=s-stcs-mixed
+
+
+kubectl -n bowenz cp dbtool-7f87f4466-q8bl2:/opt/stress/s-stcs-insert.html ./s-stcs-insert.html
+
+
+yum install fio

@@ -1,0 +1,32 @@
+LSM
+分片 , 一个节点只能只有一个分片
+副本
+列式存储
+数据压缩
+mergeTree表引擎
+向量化 - 粗理解是并行 - CPU支持SIMD命令 -- SSE4.2指令实现向量化
+多线程并发 - 作为向量化补充
+Local Table 和 Distributed Table
+Column -- 列
+Field -- 行 
+Block -- 数据对象、数据类型和列名称组成的三元组，即Column、DataType及列名称字符串
+DataType -- 数据序列化
+
+
+部署形态
+
+Vertica SparkSQL Hive
+
+grep -q sse4_2 /proc/cpuinfo && echo "SSE 4.2 supported" || echo "SSE 4.2 not supported"
+sudo yum install yum-utils
+sudo rpm --import https://repo.clickhouse.tech/CLICKHOUSE-KEY.GPG
+sudo yum-config-manager --add-repo https://repo.clickhouse.tech/rpm/stable/x86_64
+sudo yum install clickhouse-server clickhouse-client
+
+$ sudo /etc/init.d/clickhouse-server start
+$ clickhouse-server --config-file=/etc/clickhouse-server/config.xml
+$ clickhouse-client
+
+hostnamectl --static set-hostname ch5.nauu.com
+hostname -f
+security limits.d 

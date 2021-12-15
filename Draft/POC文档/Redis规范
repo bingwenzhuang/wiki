@@ -1,0 +1,484 @@
+1.  
+
+
+禁用 THP 特性； 
+vm.overcommit_memory = 1 
+tcp-backlog 生效配置
+
+ 
+使用 lazy free（延迟删除）特性；
+maxmemory
+jemalloc
+replication backlog 
+master diskless ====？？
+rename 以下命令
+flushdb
+keys
+flushall
+ 
+ 
+ 
+string  set /get  mset / mget
+hash hset / hget  hmset / hmget  dict 
+list lpush/ lrange  repeat    list 
+set sadd/ smembers /sismember / spop  not repeat not order list
+swapdb 0 1 
+
+OBJECT IDLETIME keyname -- 用于判断key的使用率
+redis-shake
+
+
+-- 这个可以用来删除失效的节点ip，从而解决浮动IP问题
+## 在sentinel进行切换时还会自动调用一个脚本 -- 这个是什么时机进行切换呢.. 
+sentinel client-reconfig-script mymaster /redis/script/failover.sh 
+ 
+
+本地搭建一个sentinel 集群
+三个节点不同端口 
+三个sentinel 节点 不同端口 
+
+搭建下本地python 环境 2.7版本的
+
+切忌多个应用使用一个redis实例
+事先做好内存容量规划
+(物理内存-4G)*70%
+选择合适的数据类型
+注意节约内存
+key-value 
+key-field-value
+为何使用冒号 -- ？
+
+类型如何选择
+
+jemalloc -- 内存分配器， 实际使用内存和申请内存的使用是不同的
+
+
+1. key 为何要使用冒号 -- 方便一些redis gui 工具 -- 这些工具基本上都是采用冒号为分隔符来归类的
+2. 类型的选择 -- 场景 -- 对象 ，关系 
+3. 注意请求的时间复杂度 -- 命令 -- O(1) O(N)--需要谨慎使用 -- 列出常用O(N) 命令 -- 列出明确禁止
+4. 字符集问题(redis server是以二进制进行存储。建议大家在客户端都采用UTF8编码) , 大小写问题(统一采用小写) 
+   
+
+
+缓存类型
+
+对象缓存
+
+定义：对象缓存主要指的是领域内业务对象类的缓存，通常对应数据库中某张表的一条记录
+数据类型：String
+Key命名：{table_name}:{id}
+维护方式: 缓存声明周期只能通过Canal+RabbitMQ来维护。原则上, 业务代码中不允许进行缓存的增删改操作
+关系缓存
+
+定义：关系缓存主要指的是业务对象之间的关系。例如：买赠活动和参加活动的商品的一对多关系
+数据类型：Hash、List、ZSet、Set
+维护方式： 1、跟对象缓存类似以Canal+RabbitMQ来处理（推荐） 2、在业务代码中处理 
+
+
+
+set：能快速做exist检查（sismember）、求交集、并集
+hash：key-value快速查找，官方建议能用hash就用hash（存储&效率高）
+sorted sets： 适合Top-K问题
+list：适用于需要queue/stack的场合（push，pop）
+
+
+string -- 常用于，只要单个字段的？？？
+hash -- 常用于结构化数据 ，带有属性
+
+
+cpu/memory 使用资源超出限制 k8s会如何处理呢？
+
+sentinel down-after-milliseconds mymaster 3000
+
+
+
+最近评论才用list 
+lpush uss:comment:<apicode>:latest <id>
+lpush uss:comment:awss3:latest "好的"
+lpush uss:comment:awss3:latest "不好"
+lpush uss:comment:awss3:latest "很好很好"
+lpush uss:comment:awss3:latest "不好用"
+
+
+排名:
+-列出前100名高分选手
+-列出某用户当前的全球排名
+
+zadd uss:user:api.order 0 api1  
+zadd uss:user:api.order 1 api2
+zadd uss:user:api.order 10 api3
+zadd uss:user:api.order 10 api4
+zadd uss:user:api.order 20 api5
+
+zrevrange uss:user:api.order 0 99
+zrank uss:user:api.order api5
+zrevrank uss:user:api.order api5
+zrange uss:user:api.order  0 -1 withscores
+
+
+
+ymall:shopcart:
+
+ymall:shopcart:<userid> sku_id+type number  
+
+ymall:shopcart:1 1189 1
+ymall:shopcart:1 1190 1
+ymall:shopcart:1 1191 2
+
+UC:user:id
+product:id
+ 
+ymall:user:id  
+ 
+商品ID
+名称
+规格ID
+规格名称
+数量
+图片
+价格
+
+hlen -- 购物车数据量
+商品id
+商品数量
+
+
+SET uid:cart_type ShoppingDataArr
+
+
+缓存 -- 过期时间
+排行 
+计数器
+社交网络
+消息队列
+
+数据规模和数据冷热
+
+Redis主程序是单线程操作，避免O(n)的操作，有O(n) 必须在业务上或者命令上加上count限制
+
+版本号第二位是偶数的为稳定版本
+
+建议多批量获取，但批量获取的个数需要进行均衡，过多会导致redis阻塞或者网络阻塞 o(n)
+
+
+Redis POD需要延迟重启 --- 30s后重启
+
+## 也一样 ，一般至少需要15s才能完成故障转移
+redis-trib.rb
+cluster-node-timeout
+cluster-require-full-coverage
+主节点需要在不同的节点上
+不建议在redis cluster上配置读写分离，成本高 。 延迟，客户端路由
+redis-migrate-tool
+bigobject 发现方式
+热点key redis-faina
+rdbtools
+
+1:uss:user:1 <personinfovalue>
+2:uss:user:1 
+
+1:uss:sc:<userid> <data>
+2:uss:sc:<userid> <skuid> <data>
+ 
+uss:user:1 friends:1 <friends> friends:2 <friends> friends:3 <friends>
+
+redis live 工具
+
+RUN sysctl vm.overcommit_memory=1
+ 
+ 
+ 
+ 
+ 
+-- 还是得采用固定IP
+ 
+ 
+最少要有6个节点， 那么前6个节点的主从故障会乱
+安装 
+kubectl apply -f redis-cluster.yml
+
+kubectl -n devops exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 \
+$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}:6379 ' -n devops)
+
+
+kubectl -n devops exec -it im-redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 \
+$(kubectl get svc -l svctype=im-redis-cluster-vip -o jsonpath='{range.items[*]}{.spec.clusterIP}:6379 ' -n devops)
+
+kubectl apply -f redis-cluster-vip.yml -n devops
+
+kubectl -n devops exec -it im-redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 \
+$(kubectl get svc -l svctype=im-redis-cluster-vip -o jsonpath='{range.items[*]}{.spec.clusterIP}:6379 ' -n devops)
+ 
+加节点
+kubectl scale statefulset redis-cluster --replicas=8
+
+添加主节点
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster add-node \
+$(kubectl -n devops get pod redis-cluster-6 -o jsonpath='{.status.podIP}'):6379 \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
+ 
+
+添加从节点
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster add-node --cluster-slave \
+$(kubectl -n devops get pod redis-cluster-5 -o jsonpath='{.status.podIP}'):6379 \
+$(kubectl -n devops get pod redis-cluster-1 -o jsonpath='{.status.podIP}'):6379
+
+redis-cli --cluster add-node 127.0.0.1:7006 127.0.0.1:7000 --cluster-slave
+
+进行数据迁移
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster rebalance --cluster-use-empty-masters \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
+
+移除节点 
+kubectl -n devops exec redis-cluster-0 -- redis-cli cluster nodes | grep $(kubectl -n devops get pod redis-cluster-7 -o jsonpath='{.status.podIP}')
+
+移除从节点
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster del-node \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 \
+a92c0db867ba49b6f81bc41ad2bb4b7fa7539875
+
+会报错，是因为pod会重启 -- 是什么造成会重启？ (Readiness) 
+-- 考虑设计statefulset下的pod 可以脱离statefulset的控制restartPolicy
+
+移除主节点
+kubectl -n devops exec redis-cluster-0 -- redis-cli cluster nodes | grep $(kubectl -n devops get pod redis-cluster-6 -o jsonpath='{.status.podIP}')
+
+kubectl -n devops exec redis-cluster-0 -- redis-cli cluster nodes | grep -v $(kubectl -n devops get pod redis-cluster-6 -o jsonpath='{.status.podIP}')  | grep master
+
+
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster reshard --cluster-yes \
+--cluster-from 1a1e898ae3db99a3c2e1283325a7a54f525a6d97 \
+--cluster-to 95076ed86b6fe5ebf88ea73407b93b8cff1c4b8d \
+--cluster-slots 16384 \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
+
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster del-node \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 \
+1a1e898ae3db99a3c2e1283325a7a54f525a6d97
+
+会报错，是因为pod会重启 -- 是什么造成会重启？ (Readiness) 
+-- 考虑设计statefulset下的pod 可以脱离statefulset的控制restartPolicy
+
+--重新平衡slot的分配
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster rebalance \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
+
+--可以尝试用权重来删除要移除主节点数据
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster rebalance  --cluster-weight \
+1a1e898ae3db99a3c2e1283325a7a54f525a6d97=0
+
+--检查集群状态
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster check \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 \
+--cluster-search-multiple-owners
+
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster info \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 
+
+--修复集群
+kubectl -n devops exec redis-cluster-0 -- redis-cli --cluster fix \
+$(kubectl -n devops get pod redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 \
+--cluster-search-multiple-owners
+
+cluster forget <node-id>
+ 
+--1从节点挂了，重启pod
+kubectl -n devops exec redis-cluster-0 -- redis-cli cluster nodes | grep slave 
+能自动重启，并挂上没问题
+--多个从节点同时挂了，情况
+集群正常，能自动恢复
+--主节点挂了，非redis-cluster-0
+能自动重启，并切换到从节点上
+--主节点挂了，redis-cluster-0
+能自动重启，并切换到从节点上
+--不同主从组的一主一从挂了
+
+
+--两个主节点同时挂了
+能恢复正常，要测试下写  -- 要在看看
+  -- 故障时候的写
+     -- 写到挂的槽会被block住，直到连接timeout  --  客户端要配置connection timeout时间
+  -- 故障后的写(没问题)
+  
+--所有的主节点都挂了
+  -- 有问题 -- 要在看看
+ 
+
+kubectl delete statefulset,svc,configmap,pvc -l app=im-redis-cluster -n devops
+
+kubectl get statefulset,svc,configmap,pvc -l app=fre-redis-cluster -n devops
+
+kubectl -n devops patch pod redis-cluster-7 -p '{"metadata":{"finalizers":null}}'
+
+
+kctl -n devops exec redis-cluster-0 -- redis-cli cluster nodes  | ./node.sh
+
+
+1. 重新修改下手动执行的yaml文件 -- 配置和启动方式 -- 可改动
+   --需要考虑的问题
+	-- 1. 如何判断statefulset已经准备就绪了
+	-- 2. create时候，如何交互
+2. 列出故障转移的情况
+   -- 
+3. 查看网上的yaml例子
+
+ 
+==第一阶段==
+1. 集群搭建
+	a. 创建6个点节点的redis-server
+	b. 6个节点组成3主3从集群
+	c. 检查集群状态
+2. 集群的扩容 -- 主从一定要按照顺序添加
+    a. 创建2个点节点的redis-server
+    b. 扩1主1从
+	c. rebalance 数据
+	d. 检查集群状态
+   - 清理干净的pvc
+3. 集群的缩容 -- 缩容也是按照顺序回收
+	a. 删除1主1从
+	b. 删除pod
+	c. 检查集群状态
+   - slave
+   - master
+   - pod 删除问题
+4. 故障转移 
+   - 什么情况下无法进行集群的故障转移
+	- 两个主节点同时挂了  -- 要求同一个集群，主节点要在不同的node上
+	- 三个主节点同时挂了 -- 
+	- 同一组的主从同时挂了 -- 要求同一个集群，同一组的主从要在不同node上？？
+	- 整个集群挂了 
+      - all恢复后是否集群状态是否正常
+   - 常见情况测试
+		- 从节点挂了
+		- 主节点挂了redis-cluster-0
+		- 主节点挂了非redis-cluster-0
+		- 多个从节点挂了
+		- 手动进行从节点升主操作 -- 一般比较少用 -- 可以直接让对应主节点挂了，进行故障转移
+5. 脑裂问题
+6. 读写分析，需要在集群的从节点上执行 readonly -- 成本比较高，可能出现延迟，而且仅能读本节点上key ，不是的话会重新路由到其他的主节点上
+   一般都是通过扩展主节点来扩展集群的性能
+ 
+   客观下线的判断标准是：当半数以上持有槽的主节点都标记某个节点是主观下线了(只有主节点才涉及到节点信息的读写维护操作)
+ 
+==第二阶段== 
+主从分布在不同的node上
+
+==第三阶段==
+监控和数据采集
+
+==第四阶段== 
+
+ 
+ 
+kubectl -n devops exec redis-cluster-0 -- redis-cli cluster nodes |  awk '{print $1" "$2" "$3}'
+kubectl -n devops get pods -o custom-columns=:metadata.name --no-headers=true --field-selector status.podIP=10.149.133.83
+
+
+
+
+redis 规范
+redis 巡检
+
+1. 可观察性
+   * metric v
+     * 采集  
+	 * 分析 
+   * logging
+     access
+	   proxy
+      * 采集 
+	  * 分析 
+   * rbd
+      * 采集/暴露
+	  * 分析
+	 
+2. 告警
+	  
+3. 巡检
+   * 内容/关注点
+	 * status/info
+	 * 告警
+	 * dashboard
+	 * report(临时检测，定时)
+   * 流程/响应机制
+     
+	
+    
+评审问题: 
+1. maxmemory/maxmemory-policy 设置为默认值,不做任何限制
+2. Redis检验和巡检机制更改为 Redis巡检(该部分重新编写和设计)
+   它应该是基于metric/logging/rbd 数据的采集和分析，输出基本信息、状态、Redis关注点、dashboard及report和后续事件处理流程。
+   
+ 
+ 
+ 
+kubectl -n devops exec im-redis-cluster-0 -- redis-cli --cluster check $(kubectl -n devops get pod im-redis-cluster-0 -o jsonpath='{.status.podIP}'):6379 --cluster-search-multiple-owners
+
+
+
+delete 方式 
+
+kubectl delete --grace-period=0 --force --timeout=0s pod im-redis-cluster-0 im-redis-cluster-2 -n devops 
+
+kubectl delete --grace-period=0 --force --timeout=0s pod im-redis-cluster-4 -n devops 
+
+  
+kubectl delete statefulset,svc,configmap,pvc -l app=im-redis-cluster -n devops
+  
+kubectl -n devops exec im-redis-cluster-0 -- redis-cli --cluster info $(kubectl -n devops get pod im-redis-cluster-0 -o jsonpath='{.status.podIP}'):6379
+
+
+kubectl -n devops exec -it im-redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 \
+$(kubectl get svc -l svctype=im-redis-cluster-vip -o jsonpath='{range.items[*]}{.spec.clusterIP}:6379 ' -n devops)
+ 
+ 
+ 
+repl-diskless-sync
+
+
+
+1. proxy 提出需求 ， 埋点数据和metrics的
+2. roles 的操作文档和故障转移 -- 说明文档
+
+【SQL规范&SQL变更流程】- 收集数据库升级项目审核权限名单人员 -- 在催下
+
+response=$(timeout -s 3 5 redis-cli -h localhost -p 6379 ping)
+
+    if [ "$response" != "PONG" ] && [ "$response" != "LOADING Redis is loading the dataset in memory" ] || [ -z ${MASTER_IP} ]; then
+      echo "$response"
+      for index in $(seq 0 1)
+      do
+        echo $index
+      done 
+    fi
+	
+${value:-$word}.
+
+
+bash scripts/new-k8s-app.sh statefulset redis_sentinel
+
+着重查看labels/selector -- 这两个得区份是sentinel还是data
+
+需要编写redis-tools 镜像
+
+1. 通过 redis-cli --rdb backup  -- backup --存储的大小 -- s3 上传
+cluster的备份，需要备份的文件-- nodes.conf --redis.conf -- dump.rdb???
+不需要nodes.conf/redis.conf
+
+
+2. 通过 直接复制rdb 文件恢复 -- 如何恢复 -- 通过s3获取， 本地存储？？
+cluster  -- 部分恢复
+# 主节点拉rdb文件
+# 重启主从节点
+
+-- 集群恢复
+# 主节点拉rdb文件
+# 节点启动起来
+# 构建集群
+# 完成
+
+sentinel
+# 主节点拉rdb文件
+# 节点启动起来
+# 构建集群
+# 完成

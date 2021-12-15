@@ -1,0 +1,167 @@
+datasource region namespace clustername (dc) -- 暂时不要了
+cassandra_endpoint_active
+
+label_values(cassandra_endpoint_active{label_app="cass"},region)
+
+cassandra_client_native_connections{cassandra_node="$node"}
+
+Basic Information
+	- 中心名称 
+	- 集群个数 
+	- 集群活跃书
+	- 集群pod detail --展示内容
+		- region namespace podname podstatus uptime
+	- 集群memory，cpu，disk
+	- schema概况
+	- 最近一次jvm执行时间及jvm heap和no-head memory used (可能不要 迁移到jvm 模块)
+	- 登录成功次数和登录失败次数(权限认证)
+	- connection number
+	- 表的大小
+	    - region
+		- namespace
+		- clustername
+		- keyspace
+		- tablename
+		- live       cassandra_table_live_disk_space_bytes   A 
+		- disk       cassandra_table_disk_space_bytes       B 
+		- snapshots  cassandra_table_snapshots_size_bytes_total  C 
+		- 分区数量   cassandra_table_estimated_partitions   D 
+		- 分区大小   	  cassandra_table_estimated_partition_size_bytes quantile E 
+		- sstable count   cassandra_table_live_sstables F
+	- commitlog 大小
+Performance 
+	- qps /duration -- type: all  / request failed and request timeout count and unavailable exceptions_ / 注意跟 cassandra_cql_statements_executed_total 的区分 (对比下)
+	- tps / duration -- type: casread/caswrite/write/viewwrite
+	- coordinator duration 协调器反应时间
+	- commitlog
+		- pending/completed
+		- duration
+		- Alocatioin duration
+		- size  / capacity(--???)
+	- 墓碑
+		- scan query 
+	- 表压实  Compaction
+		- completed tasks  remove
+		- compaction bytes by table?? cassandra_table_compaction_bytes_written_total
+		- pending tasks by table??  cassandra_table_estimated_pending_compactions
+	- 表压缩  Compression 压缩率和压缩使用内存情况 --  这个展示在table stats 还是performance ？ cassandra_table_compression_ratio cassandra_table_compression_metadata_offheap_bytes -- 表级别就可以了 没必要
+	- memtable flush / cassandra_memtable_pool_allocation_latency_seconds   -- cassandra_table_free_memtable_latency_seconds 告警
+	- thread pool task stats 
+	- cache(key , row cache) ratio / capacity / request / entries /  chunk cache(file_cache_size_in_mb  
+		- key
+		- row 
+		- counter
+		- chunk 
+		- buffer pool()
+		cassandra_cache_entries{}	   sum(cassandra_cache_entries) by(cache,pod)
+		cassandra_cache_estimated_size_bytes{}	  sum(cassandra_cache_estimated_size_bytes) by(cache,pod) 
+		cassandra_cache_capacity_bytes sum(cassandra_cache_capacity_bytes ) by(cache,pod) 
+		cassandra_cache_hits_total  sum(cassandra_cache_hits_total ) by(cache,pod) 
+		cassandra_cache_requests_total sum(cassandra_cache_requests_total ) by(cache,pod) 
+		cassandra_cache_hits_total/ cassandra_cache_requests_total  
+	- Bloom Filter 
+	- repair 修复率 -- 用于观察那些表是否需要修复(需要剔除一些keyspaces ,如 system和repair_db) -->  anti-entropy repair
+	- gossip
+	- Speculative 
+	- hint 
+	- dropped message (transfer message  or dropped message)  背压
+		- MUTATION
+		- Read
+		- _TRACE
+	- partition row/size ??  by table (不要)
+	- storage ?? (不要)
+Table info(???) cassandra_table_speculative_retries_total
+JVM 
+    - cpu/memory -- 可以跟pod container对比下 cassandra_os_1m_load_average load 这个要
+	- heap and no-head memory used
+	- nio buffer userd and user number
+    - jvm gc duration
+	- jvm gc number
+	- jvm current thread number and new thread number
+System Info
+	- cpu usage/load(jvm and node)
+	- memory usage
+	- network bandwidth
+	- disk usage 
+	- disk iops 
+	- disk duration
+	- disk io util
+	- disk throught
+	- node cpu iowait usage
+	
+	
+/root/work/yaml/tmp/
+	
+	
+指标分类，在跟上面分层合并
+cache and buffer pool(ByteBuffers - ，目前理解为chunk -- 可以预留观察 -- 不可作为主要指标) 
+client login 
+client request(qps /tps)
+
+cassandra_cql ?? 这个是什么指标
+
+connection 
+commitlog
+compaction 
+
+
+	
+Keyspace : local_quorum1
+        Read Count: 0
+        Read Latency: NaN ms
+        Write Count: 10000134
+        Write Latency: 0.0633630666349071 ms
+        Pending Flushes: 0
+        Table: standard1
+        SSTable count: 7
+        Space used (live): 2526697345
+        Space used (total): 2526697345
+        Space used by snapshots (total): 0
+        Off heap memory used (total): 14259468
+        SSTable Compression Ratio: -1.0
+        Number of partitions (estimate): 10077871
+        Memtable cell count: 4818
+        Memtable data size: 1344222
+        Memtable off heap memory used: 0
+        Memtable switch count: 391
+        Local read count: 0
+        Local read latency: NaN ms
+        Local write count: 10000134
+        Local write latency: NaN ms
+        Pending flushes: 0
+        Percent repaired: 0.0
+        Bloom filter false positives: 0
+        Bloom filter false ratio: 0.00000
+        Bloom filter space used: 12541544
+        Bloom filter off heap memory used: 12541488
+        Index summary off heap memory used: 1717980
+        Compression metadata off heap memory used: 0
+        Compacted partition minimum bytes: 180
+        Compacted partition maximum bytes: 258
+        Compacted partition mean bytes: 258
+        Average live cells per slice (last five minutes): NaN
+        Maximum live cells per slice (last five minutes): 0
+        Average tombstones per slice (last five minutes): NaN
+        Maximum tombstones per slice (last five minutes): 0
+        Dropped Mutations: 0
+
+label_values(cassandra_thread_pool_active_tasks{cassandra_cluster="$cluster"}, pool)
+
+consistency
+operation
+quantile
+
+cassandra Compare and Set (CAS)
+
+kubectl create job cass-test-bk-202103011121 --from=cronjob/cass-test  -n bowenz
+
+
+
+cassandra-stress write n=10000000 cl=LOCAL_QUORUM no-warmup -mode native cql3 user=root password=cassandra -rate threads=3 -schema replication\(strategy=NetworkTopologyStrategy,DC1=3,DC2=3\) keyspace="local_quorum1"  -node cass-test-0.cass-test.bowenz.svc.cluster.local,cass-test-1.cass-test.bowenz.svc.cluster.local,cass-test-2.cass-test.bowenz.svc.cluster.local
+ 
+ 
+ 
+ 
+bash scripts/test-role.sh cass -e k8s_namespace=bowenz -e cass_release_name=cass-test -e cass_broadcast_address_lb_manul=yes -e cass_storageClassName=gp2 -e docker_registry=registry-eu-central-1.yealinkops.com -e cass_dc=DC2 -e cass_rack=RAC2
+
+bash scripts/test-role.sh cass -e k8s_namespace=bowenz -e cass_release_name=cass-test -e cass_broadcast_address_lb_manul=yes

@@ -1,0 +1,56 @@
+告警项
+	- cpu
+		(sum(rate(container_cpu_usage_seconds_total{container="cass"}[2m])) by (region,namespace,pod) / (sum(container_spec_cpu_quota{container="cass"}/100000) by (region,namespace,pod)) * 100) >= 60
+	- memory
+		(sum (container_memory_rss{container="cass"}) by (region,namespace,pod)/ sum(kube_pod_container_resource_limits_memory_bytes{container="cass"}) by (region,namespace,pod) * 100) >= 95
+	- disk (???)
+	- cache hit ratio 
+		(avg(rate(cassandra_cache_hits_total{cache="key"}[1m]) / ((rate(cassandra_cache_requests_total{cache="key"}[1m]))>0)) by (region,namespace,pod)) < 0.9
+		(avg(rate(cassandra_cache_hits_total{cache="row"}[1m]) / ((rate(cassandra_cache_requests_total{cache="row"}[1m]))>0)) by (region,namespace,pod)) < 0.9
+		(avg(rate(cassandra_cache_hits_total{cache="counter"}[1m]) / ((rate(cassandra_cache_requests_total{cache="counter"}[1m]))>0)) by (region,namespace,pod)) < 0.9
+		(avg((rate(cassandra_cache_requests_total{cache="chunk"}[1m]) - rate(cassandra_cache_miss_latency_seconds_count{cache="chunk"}[1m])) / ((rate(cassandra_cache_requests_total{cache="chunk"}[1m]))>0)) by (region,namespace,pod)) < 0.9
+	- 认证错误
+	   increase(cassandra_client_authentication_failures_total[1m]) > 0
+	- 请求失败次数
+	   increase(cassandra_client_request_failures_total[1m]) > 0
+	- 请求延迟
+	   sum(cassandra_client_request_latency_seconds{quantile="0.999"}) by (region,namespace,label_release) > 1
+	- 请求超时
+	   increase(cassandra_client_request_timeouts_total[1m]) > 0 
+	- 请求不可到
+	   increase(cassandra_client_request_unavailable_exceptions_total[1m]) > 0
+	- commitlog 提交延迟
+	   cassandra_commit_log_commit_latency_seconds{quantile="0.999"} > 0.0001 
+	- commitlog pending task 
+	   cassandra_commit_log_pending_tasks >0 
+	- commitlog 分配延迟
+	   cassandra_commit_log_segment_allocation_latency_seconds{quantile="0.999"} > 0.0001 
+	- commitlog size
+	   cassandra_commit_log_size_bytes > 2147483648
+	- compaction pending task
+		cassandra_table_estimated_pending_compactions > 0
+	- 被驱逐的语句
+		increase(cassandra_cql_prepared_statements_evicted_total[1m]) >0 
+	- 背压丢弃请求
+		increase(cassandra_dropped_messages_total[1m])  --message_type
+	- 失连接点
+		cassandra_endpoint_active < 1 (endpoint_datacenter)
+	- jvm heap usage 警告
+		sum(cassandra_jvm_memory_pool_used_bytes{type="HEAP"}) by(region,namespace,pod) / sum(cassandra_jvm_memory_pool_maximum_bytes{type="HEAP"}) by(region,namespace,pod) > 0.90
+		sum(cassandra_jvm_memory_pool_used_bytes{type="HEAP"}) by(region,namespace,pod) / sum(cassandra_jvm_memory_pool_maximum_bytes{type="HEAP"}) by(region,namespace,pod) > 0.99
+	- jvm gc duration 告警
+		rate(cassandra_jvm_gc_estimated_collection_duration_seconds_total[1m]) > 0.5
+	- memtable 分配延迟告警
+		cassandra_memtable_pool_allocation_latency_seconds{quantile="0.999"} > 0.0001 
+	- wait free memtable memory
+		cassandra_table_free_memtable_latency_seconds{quantile="0.999"} > 0.0001 
+	- memtable pending task 
+	    cassandra_table_pending_flushes > 0
+	- storage exception 
+		increase(cassandra_storage_exceptions_total[1m]) > 0 
+	- 布隆过滤器假阳性率
+		cassandra_table_bloom_filter_false_ratio >0  --不是很重要
+	- 被阻塞线程池 
+		increase(cassandra_thread_pool_blocked_tasks_total[1m])  >0 
+
+ 

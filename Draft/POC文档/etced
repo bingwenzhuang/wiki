@@ -1,0 +1,61 @@
+# 当前集群状态是 3 个节点
+ETCD_DOCKER_TAG=registry-cn-shanghai.yealinkops.com/devops/etcd:3.4.3
+
+# 0. 模拟访问
+kubectl run etcd-tester --restart=Never  \
+--env=ETCDCTL_ENDPOINTS=http://etcd-0.etcd:2379,http://etcd-1.etcd:2379,http://etcd-2.etcd:2379 \
+--image=$ETCD_DOCKER_TAG \
+--command -- sleep 100d
+# kubectl exec -it etcd-tester bash
+kubectl exec -it etcd-tester -- bash -c 'export ETCDCTL_API=3; for i in $(seq 0 100); do for j in $(seq 0 1000); do  etcdctl put $i/$j $i-$j; etcdctl get $i/$j; done; done'
+
+### 监控集群状态
+kubectl exec -it etcd-tester -- watch -n 0.1 "ETCDCTL_API=2 etcdctl cluster-health"
+kubectl exec -it etcd-tester -- watch -n 0.1 "ETCDCTL_API=2 etcdctl member list"
+
+# 1. 缩容
+kubectl scale --replicas=2 sts etcd
+kubectl scale --replicas=1 sts etcd
+kubectl scale --replicas=0 sts etcd
+
+kubectl scale --replicas=3 sts etcd
+
+# 2. 下线 master 节点
+### 删除 master 节点
+kubectl delete pod $(kubectl exec -it etcd-tester -- etcdctl member list | grep "isLeader=true" | awk '{print $2}' | awk -F'=' '{print $2}')
+
+### 强制删除 master 节点
+kubectl delete --grace-period=0 --force --timeout=0s pod $(kubectl exec -it etcd-tester -- etcdctl member list | grep "isLeader=true" | awk '{print $2}' | awk -F'=' '{print $2}')
+
+### 模拟中断 master 节点
+kubectl exec $(kubectl exec -it etcd-tester -- etcdctl member list | grep "isLeader=true" | awk '{print $2}' | awk -F'=' '{print $2}') -- kill -SIGABRT 1
+
+### replicas=2 时 执行上述步骤
+kubectl scale --replicas=2 sts etcd
+
+### 恢复集群正常副本
+kubectl scale --replicas=3 sts etcd
+
+# 3. 强制下线
+REPLICAS=3
+for i in $(seq 0 $(( $REPLICAS - 1 ))); do kubectl delete pod etcd-$i --grace-period=0 --force --timeout=0s & done
+
+# 4. 模拟异常中断
+REPLICAS=3
+for i in $(seq 0 $(( $REPLICAS - 1 ))); do kubectl exec  etcd-$i -- kill -SIGABRT 1 & done
+
+# 5. 扩容
+kubectl scale --replicas=5 sts etcd
+
+
+ENDPOINTS=[127.0.0.1:2379]
+ETCDCTL_API=3 etcdctl --endpoints=$ENDPOINTS member list
+
+
+HOST_1=10.149.66.67
+HOST_2=10.149.73.153
+HOST_3=10.149.75.1
+ENDPOINTS=$HOST_1:2379,$HOST_2:2379,$HOST_3:2379
+ETCDCTL_API=3 etcdctl --endpoints=$ENDPOINTS member list
+
+ --rdb <filename>   Transfer an RDB dump from remote server to local file.
